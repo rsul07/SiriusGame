@@ -7,11 +7,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'primary': '#2563EB', // Насыщенный синий
-        'bgMain': '#EEF2FF',  // Светлый фон
-      },
-      fontFamily: {
-        sans: ['system-ui', 'sans-serif'],
+        bgMain: '#EEF2FF',
+        primary: '#580190',
       },
     },
   },

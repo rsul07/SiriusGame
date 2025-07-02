@@ -7,7 +7,7 @@ const authStore = useAuthStore()
 
 const navItems = [
   { name: 'Домой', path: '/app/home', nameMatch: 'Home', iconD: 'M10.707 2.293a1 1 0 0 0-1.414 0l-7 7a1 1 0 0 0 1.414 1.414L4 10.414V17a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-6.586l.293.293a1 1 0 0 0 1.414-1.414l-7-7Z' },
-  { name: 'Мероприятия', path: '/app/events', nameMatch: 'Events', iconD: 'M8 1h8a5 5 0 0 1 0 10H8A5 5 0 0 1 8 1ZM4 15a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4V5H4v10Z' },
+  { name: 'Мероприятия', path: '/app/events', nameMatch: 'Events', isCustomIcon: true },
 ]
 
 const profileNavItem = computed(() => ({
@@ -20,7 +20,6 @@ const profileNavItem = computed(() => ({
 <template>
   <nav class="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-gray-200">
     <div class="grid h-full max-w-lg grid-cols-3 mx-auto font-medium">
-      <!-- Домой и Мероприятия -->
       <RouterLink
         v-for="item in navItems"
         :key="item.name"
@@ -28,7 +27,14 @@ const profileNavItem = computed(() => ({
         class="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 group"
         :class="{ 'text-primary': $route.name === item.nameMatch }"
       >
-        <svg class="w-6 h-6 mb-1 text-gray-500 group-hover:text-primary" :class="{ '!text-primary': $route.name === item.nameMatch }" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+        <!-- Кастомная SVG иконка для Мероприятий -->
+        <svg v-if="item.isCustomIcon" class="w-6 h-6 mb-1 text-gray-500 group-hover:text-primary" :class="{ '!text-primary': $route.name === item.nameMatch }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        <!-- Обычная иконка для остальных -->
+        <svg v-else class="w-6 h-6 mb-1 text-gray-500 group-hover:text-primary" :class="{ '!text-primary': $route.name === item.nameMatch }" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
           <path :d="item.iconD"/>
         </svg>
         <span class="text-sm text-gray-500 group-hover:text-primary" :class="{ '!text-primary': $route.name === item.nameMatch }">{{ item.name }}</span>

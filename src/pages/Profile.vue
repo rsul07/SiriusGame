@@ -36,14 +36,35 @@ const registeredEvents = computed(() => eventStore.events.filter(event => authSt
 
 const copyUserId = async () => {
   if (!authStore.user?.id) return;
+  
+  const textToCopy = authStore.user.id;
   try {
-    await navigator.clipboard.writeText(authStore.user.id);
+    // Пробуем современный метод
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(textToCopy);
+    } else {
+      // Fallback для небезопасных контекстов
+      const textArea = document.createElement('textarea');
+      textArea.value = textToCopy;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      if (!successful) {
+        throw new Error('Copy failed');
+      }
+      
+      document.body.removeChild(textArea);
+    }
+
     copyIdText.value = 'Скопировано!';
     setTimeout(() => {
       copyIdText.value = 'Копировать ID';
-    }, 2000); // Сбрасываем текст через 2 секунды
+    }, 2000);
   } catch (err) {
-    console.error('Failed to copy ID: ', err);
+    console.error('Ошибка копирования:', err);
     copyIdText.value = 'Ошибка';
     setTimeout(() => {
       copyIdText.value = 'Копировать ID';
