@@ -73,9 +73,11 @@ const openViewer = (index: number) => {
           <button v-if="event.state !== 'future'" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
         </div>
         <div>
-          <div v-if="activeSubTab === 'description'"><p class="text-gray-700 leading-relaxed">{{ event.description }}</p></div>
+          <div v-if="activeSubTab === 'description'">
+            <p class="text-gray-700 leading-relaxed mb-4">{{ event.description }}</p>
+          </div>
           <div v-if="activeSubTab === 'activities'">
-            <ul class="space-y-3">
+            <ul class="space-y-3 mb-4">
               <li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
                 <span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span>
                 <span class="font-medium text-gray-800">{{ activity.name }}</span>
