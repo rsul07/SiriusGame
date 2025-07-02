@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Глобальные стили, если понадобятся. Например, для body */
+@layer base {
+  body {
+    @apply bg-bgMain font-sans;
+  }
+}
