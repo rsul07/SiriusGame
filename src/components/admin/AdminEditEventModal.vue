@@ -15,28 +15,27 @@ const isCreating = computed(() => !props.event?.id);
 
 watch(() => props.event, (newEvent) => {
   if (newEvent && newEvent.id) {
-    const eventDate = newEvent.event_date ? new Date(newEvent.event_date).toISOString().split('T')[0] : '';
-    localEvent.value = { ...newEvent, event_date: eventDate };
+    const eventDate = newEvent.date ? new Date(newEvent.date).toISOString().split('T')[0] : '';
+    localEvent.value = { ...newEvent, date: eventDate };
   } else {
     localEvent.value = {
       title: '',
       description: '',
       state: 'future',
       type: 'individual',
-      event_date: new Date().toISOString().split('T')[0],
-      rules: {}
+      date: new Date().toISOString().split('T')[0],
     };
   }
 }, { immediate: true, deep: true });
 
 const onSave = () => {
-  if (!localEvent.value.title || !localEvent.value.event_date) {
+  if (!localEvent.value.title || !localEvent.value.date) {
     alert('Название и дата обязательны для заполнения');
     return;
   }
   const eventData = { ...localEvent.value };
-  if (eventData.event_date) {
-    eventData.event_date = new Date(eventData.event_date).toISOString();
+  if (eventData.date) {
+    eventData.date = new Date(eventData.date).toISOString();
   }
   emit('save', eventData);
 };
@@ -78,7 +77,7 @@ const onSave = () => {
 
         <div>
             <label for="date" class="block text-sm font-medium text-gray-700">Дата проведения</label>
-            <input v-model="localEvent.event_date" type="date" id="date" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+            <input v-model="localEvent.date" type="date" id="date" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
         </div>
 
         <div class="flex justify-end gap-4 pt-4">
