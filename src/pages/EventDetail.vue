@@ -5,6 +5,7 @@ import { useEventStore, type IEvent } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import Modal from '@/components/Modal.vue'
+import { copyToClipboard } from '@/utils/clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,14 +63,16 @@ function handleParticipate() {
 function getShareUrl() { return window.location.href; }
 
 async function copyShareLink() {
-  try {
-    await navigator.clipboard.writeText(getShareUrl());
+  const success = await copyToClipboard(getShareUrl());
+  if (success) {
     copyButtonText.value = 'Скопировано!';
     setTimeout(() => {
       copyButtonText.value = 'Копировать';
       showShareMenu.value = false;
     }, 1500);
-  } catch (err) { alert('Не удалось скопировать ссылку'); }
+  } else {
+    alert('Не удалось скопировать ссылку. Пожалуйста, сделайте это вручную.');
+  }
 }
 
 const nextImage = () => { if(event.value) currentImageIndex.value = (currentImageIndex.value + 1) % event.value.imgUrls.length }
@@ -96,26 +99,37 @@ const openViewer = (index: number) => {
       </button>
     </div>
     
-    <div :class="{'pb-32' : event.state === 'future'}">
-      <div class="p-4">
-        <h1 class="text-3xl font-bold mb-4">{{ event.title }}</h1>
-        <div class="flex border-b mb-4">
-          <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
-          <button @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
-          <button v-if="event.state !== 'future'" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
+    <div class="p-4">
+      <h1 class="text-3xl font-bold mb-4">{{ event.title }}</h1>
+      <div class="flex border-b mb-4">
+        <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
+        <button @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
+        <button v-if="event.state !== 'future'" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
+      </div>
+      <div>
+        <div v-if="activeSubTab === 'description'">
+          <p class="text-gray-700 leading-relaxed">{{ event.description }}</p>
         </div>
-        <div>
-          <div v-if="activeSubTab === 'description'"><p class="text-gray-700 leading-relaxed mb-4">{{ event.description }}</p></div>
-          <div v-if="activeSubTab === 'activities'"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div>
-          <div v-if="activeSubTab === 'leaderboard'">
-            <LeaderboardPedestal :leaders="topThree" />
-            <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
+        <div v-if="activeSubTab === 'activities'">
+          <ul class="space-y-3">
+            <li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+              <span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span>
+              <span class="font-medium text-gray-800">{{ activity.name }}</span></li>
+            </ul>
           </div>
+        <div v-if="activeSubTab === 'leaderboard'">
+          <LeaderboardPedestal :leaders="topThree" />
+          <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
         </div>
       </div>
+      
+      <!-- 👇👇👇 ИЗМЕНЕНИЕ ЗДЕСЬ 👇👇👇 -->
+      <!-- Распорка для закрепленного футера. Появляется только когда виден футер. -->
+      <!-- h-28 (7rem) для плавающей панели -->
+      <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
 
-    <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200">
+    <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
       <div class="max-w-md mx-auto"><div class="flex justify-between items-center mb-4 text-center"><div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div><div><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.participants || 0 }}</p></div><div v-if="event.type === 'team'"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.teams || 0 }}</p></div></div><button @click="handleParticipate" class="w-full bg-primary text-white font-bold py-3 rounded-lg text-lg hover:opacity-90 transition-opacity">{{ authStore.isAuthenticated ? 'Участвовать' : 'Войти, чтобы участвовать' }}</button></div>
     </footer>
 
@@ -124,28 +138,27 @@ const openViewer = (index: number) => {
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="isViewerOpen" @click.self="isViewerOpen = false" class="fixed inset-0 bg-white/50 dark:bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <img :src="event.imgUrls[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg">
-          
-          <div class="absolute top-4 left-4 flex gap-2">
-            <button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors">
-              <!-- ИСПРАВЛЕННАЯ ИКОНКА ПОВОРОТА -->
-              <svg class="w-6 h-6" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/>
-              </svg>
-            </button>
-          </div>
-          <button @click="isViewerOpen = false" class="h-10 w-10 flex items-center justify-center absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-          <button v-if="event.imgUrls.length > 1" @click.stop="prevImage" class="h-10 w-10 flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors">
-             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-          </button>
-          <button v-if="event.imgUrls.length > 1" @click.stop="nextImage" class="h-10 w-10 flex items-center justify-center absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors">
-             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-          </button>
+          <Transition name="image-fade" mode="out-in">
+            <img :key="currentImageIndex" :src="event.imgUrls[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg">
+          </Transition>
+          <div class="absolute top-4 left-4 flex gap-2"><button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/></svg></button></div>
+          <button @click="isViewerOpen = false" class="h-10 w-10 flex items-center justify-center absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+          <button v-if="event.imgUrls.length > 1" @click.stop="prevImage" class="h-10 w-10 flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+          <button v-if="event.imgUrls.length > 1" @click.stop="nextImage" class="h-10 w-10 flex items-center justify-center absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
         </div>
       </Transition>
     </Teleport>
   </div>
   <div v-else class="text-center pt-20">Загрузка...</div>
 </template>
+
+<style scoped>
+.image-fade-enter-active,
+.image-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.image-fade-enter-from,
+.image-fade-leave-to {
+  opacity: 0;
+}
+</style>
