@@ -85,7 +85,7 @@ onMounted(() => {
               'bg-gray-200 text-gray-800': event.state === 'past',
             }">{{ event.state }}</span></td>
             <td class="p-4 capitalize">{{ event.type }}</td>
-            <td class="p-4">{{ new Date(event.event_date).toLocaleDateString() }}</td>
+            <td class="p-4">{{ new Date(event.date).toLocaleDateString() }}</td>
             <td class="p-4 text-right">
               <button @click="openEditModal(event)" class="text-primary hover:underline font-medium">Редактировать</button>
               <button @click="openDeleteConfirm(event)" class="ml-4 text-red-600 hover:underline font-medium">Удалить</button>

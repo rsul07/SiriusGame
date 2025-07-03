@@ -57,8 +57,8 @@ const router = createRouter({
 })
 
 // Глобальный навигационный гард
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
+router.beforeEach((to, _, next) => {
+  const authStore = useAuthStore();
 
   // Проверка прав администратора
   if (to.meta.requiresAdmin && !authStore.user?.is_superuser) {
@@ -68,8 +68,8 @@ router.beforeEach((to, from, next) => {
 
   // Проверка обычной авторизации
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-     authStore.setRedirectPath(to.fullPath);
-     return next({ name: 'Profile' });
+    authStore.setRedirectPath(to.fullPath);
+    return next({ name: 'Profile' });
   }
 
   next();
