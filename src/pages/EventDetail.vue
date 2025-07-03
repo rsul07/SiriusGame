@@ -107,8 +107,16 @@ const openViewer = (index: number) => {
         <button v-if="event.state !== 'future'" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
       </div>
       <div>
-        <div v-if="activeSubTab === 'description'"><p class="text-gray-700 leading-relaxed mb-4">{{ event.description }}</p></div>
-        <div v-if="activeSubTab === 'activities'"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div>
+        <div v-if="activeSubTab === 'description'">
+          <p class="text-gray-700 leading-relaxed">{{ event.description }}</p>
+        </div>
+        <div v-if="activeSubTab === 'activities'">
+          <ul class="space-y-3">
+            <li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+              <span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span>
+              <span class="font-medium text-gray-800">{{ activity.name }}</span></li>
+            </ul>
+          </div>
         <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
           <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
@@ -118,7 +126,7 @@ const openViewer = (index: number) => {
       <!-- 👇👇👇 ИЗМЕНЕНИЕ ЗДЕСЬ 👇👇👇 -->
       <!-- Распорка для закрепленного футера. Появляется только когда виден футер. -->
       <!-- h-28 (7rem) для плавающей панели -->
-      <div v-if="event.state === 'future'" class="h-28"></div>
+      <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
 
     <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
