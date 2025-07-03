@@ -5,6 +5,7 @@ import { useEventStore, type IEvent } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import Modal from '@/components/Modal.vue'
+import { copyToClipboard } from '@/utils/clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,14 +63,16 @@ function handleParticipate() {
 function getShareUrl() { return window.location.href; }
 
 async function copyShareLink() {
-  try {
-    await navigator.clipboard.writeText(getShareUrl());
+  const success = await copyToClipboard(getShareUrl());
+  if (success) {
     copyButtonText.value = 'Скопировано!';
     setTimeout(() => {
       copyButtonText.value = 'Копировать';
       showShareMenu.value = false;
     }, 1500);
-  } catch (err) { alert('Не удалось скопировать ссылку'); }
+  } else {
+    alert('Не удалось скопировать ссылку. Пожалуйста, сделайте это вручную.');
+  }
 }
 
 const nextImage = () => { if(event.value) currentImageIndex.value = (currentImageIndex.value + 1) % event.value.imgUrls.length }
@@ -128,8 +131,7 @@ const openViewer = (index: number) => {
           
           <div class="absolute top-4 left-4 flex gap-2">
             <button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors">
-              <!-- ИСПРАВЛЕННАЯ ИКОНКА ПОВОРОТА -->
-              <svg class="w-6 h-6" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
                 <path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/>
               </svg>
             </button>
