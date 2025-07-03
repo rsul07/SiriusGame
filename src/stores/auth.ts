@@ -11,7 +11,9 @@ export interface User {
   weight?: number
   birthday?: string
   gender?: 'male' | 'female'
-  is2FAEnabled?: boolean
+  is_verified?: boolean
+  is_2fa_enabled?: boolean
+  is_superuser?: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -21,7 +23,8 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(JSON.parse(localStorage.getItem('user_info') || 'null'))
   const redirectPath = ref<string | null>(null)
   
-  const registeredEventIds = ref<number[]>([1, 2]) 
+  // Симуляция мероприятий, на которые зарегистрирован пользователь
+  const registeredEventIds = ref<number[]>([1, 3]) 
 
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const userAvatar = computed(() => user.value?.avatarUrl || '/img/icons/default-avatar.svg')
@@ -41,15 +44,18 @@ export const useAuthStore = defineStore('auth', () => {
     console.log('Logging in with:', payload)
     await new Promise(resolve => setTimeout(resolve, 800));
     
+    // Симуляция ответа от API. Пользователь теперь всегда будет администратором.
     const fakeUserFromDB: User = { 
       id: 'user-123', 
       email: payload.email,
-      fullName: 'Иван Иванов',
-      avatarUrl: `https://i.pravatar.cc/150?u=user-123`,
-      is2FAEnabled: true,
+      fullName: 'Администратор Иван',
+      avatarUrl: `https://i.pravatar.cc/150?u=admin-123`,
+      is_superuser: true, // <-- ДАЕМ ПРАВА АДМИНА
+      is_verified: true,
+      is_2fa_enabled: false, // Отключим 2FA для простоты тестирования
     };
 
-    if (fakeUserFromDB.is2FAEnabled) {
+    if (fakeUserFromDB.is_2fa_enabled) {
       console.log('2FA is required for this user.');
       return { requires2FA: true };
     }
@@ -67,9 +73,11 @@ export const useAuthStore = defineStore('auth', () => {
     const fakeUser: User = { 
       id: 'user-123', 
       email: 'user@example.com',
-      fullName: 'Иван Иванов',
-      avatarUrl: `https://i.pravatar.cc/150?u=user-123`,
-      is2FAEnabled: true,
+      fullName: 'Администратор Иван',
+      avatarUrl: `https://i.pravatar.cc/150?u=admin-123`,
+      is_superuser: true,
+      is_verified: true,
+      is_2fa_enabled: true,
     };
     
     setAuthData('fake-jwt-token-on-2fa-verified', fakeUser)
