@@ -6,7 +6,6 @@ import BottomNavbar from '@/components/BottomNavbar.vue'
 const route = useRoute()
 const transitionName = ref('slide-fade')
 
-// Определяем порядок наших основных вкладок
 const routeOrder: { [key: string]: number } = {
   Home: 0,
   Events: 1,
@@ -19,11 +18,9 @@ watch(
     const toOrder = routeOrder[to as string]
     const fromOrder = routeOrder[from as string]
 
-    // Если мы переходим между основными вкладками, определяем направление
     if (toOrder !== undefined && fromOrder !== undefined) {
       transitionName.value = toOrder > fromOrder ? 'slide-left' : 'slide-right'
     } else {
-      // Для всех остальных переходов (например, на EventDetail) используем простую анимацию затухания
       transitionName.value = 'fade-only'
     }
   }
@@ -32,10 +29,16 @@ watch(
 
 <template>
   <div class="flex flex-col h-screen bg-bgMain">
-    <main class="flex-1 overflow-y-auto pb-16 relative">
+    <!-- Main теперь просто контейнер для позиционирования -->
+    <main class="flex-1 relative overflow-hidden">
       <RouterView v-slot="{ Component, route }">
         <Transition :name="transitionName" mode="out-in">
-          <div :key="route.name" class="absolute w-full h-full">
+          <!-- 
+            КЛЮЧЕВОЕ ИЗМЕНЕНИЕ:
+            Скролл и padding теперь здесь, ВНУТРИ анимированного блока.
+            pb-16 (padding-bottom: 4rem) компенсирует высоту BottomNavbar.
+          -->
+          <div :key="route.name" class="absolute w-full h-full overflow-y-auto pb-16">
             <component :is="Component" />
           </div>
         </Transition>
@@ -47,10 +50,6 @@ watch(
 </template>
 
 <style>
-/* 
-  Стили для анимации перехода. 
-  'scoped' убран, чтобы стили применялись к компонентам внутри RouterView.
-*/
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,
@@ -60,7 +59,6 @@ watch(
   transition: all 0.25s ease-out;
 }
 
-/* Движение ВЛЕВО (например, с Домой на Мероприятия) */
 .slide-left-enter-from {
   opacity: 0;
   transform: translateX(50px);
@@ -70,7 +68,6 @@ watch(
   transform: translateX(-50px);
 }
 
-/* Движение ВПРАВО (например, с Мероприятий на Домой) */
 .slide-right-enter-from {
   opacity: 0;
   transform: translateX(-50px);
@@ -80,7 +77,6 @@ watch(
   transform: translateX(50px);
 }
 
-/* Только затухание (для входа/выхода из карточек) */
 .fade-only-enter-from,
 .fade-only-leave-to {
   opacity: 0;
