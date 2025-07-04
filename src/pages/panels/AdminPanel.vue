@@ -156,7 +156,7 @@ onMounted(() => {
             <div><label class="block text-sm font-medium text-gray-700">Описание</label><textarea v-model="form.data.description" rows="4" class="mt-1 w-full p-2 border rounded-md"></textarea></div>
             <div class="grid md:grid-cols-2 gap-6">
               <div><label class="block text-sm font-medium text-gray-700">URL изображений (каждый с новой строки)</label><textarea :value="form.data.imgUrls?.join('\n')" @input="form.data.imgUrls = ($event.target as HTMLTextAreaElement).value.split('\n')" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea></div>
-              <div><label class="block text-sm font-medium text-gray-700">URL карты (Yandex, Google)</label><input v-model="form.data.mapUrl" type="text" class="mt-1 w-full p-2 border rounded-md"></div>
+              <!-- <div><label class="block text-sm font-medium text-gray-700">URL карты (Yandex, Google)</label><input v-model="form.data.mapUrl" type="text" class="mt-1 w-full p-2 border rounded-md"></div> -->
             </div>
             <div>
               <h3 class="font-medium mb-2">События (Activities)</h3>

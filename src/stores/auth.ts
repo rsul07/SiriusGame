@@ -62,8 +62,17 @@ export const useAuthStore = defineStore('auth', () => {
     return { requires2FA: false };
   }
 
-  async function register(payload: { fullName: string, email: string, password: string }) { /* ... */ }
-  async function verify2FA(code: string) { /* ... */ }
+  async function register(payload: { fullName: string, email: string, password: string }) {
+    console.log('Registering user:', payload.email);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // В реальном приложении бэкенд отправит письмо. Мы не авторизуем пользователя.
+  }
+
+  async function verify2FA(code: string) {
+    console.log('Verifying 2FA code:', code);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // В реальном приложении бэкенд отправит письмо. Мы не авторизуем пользователя.
+  }
   
   function logout() {
     // Убираем confirm() отсюда. Управление теперь только в компоненте.
