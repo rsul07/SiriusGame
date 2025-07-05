@@ -18,15 +18,27 @@ export interface Activity {
 export interface IEvent {
   id: number
   title: string
-  type: 'individual' | 'team'
-  imgUrls: string[]
+  is_team: boolean
   date: string
   state: 'future' | 'current' | 'past'
   description: string
-  participants?: number
-  teams?: number
-  leaderboard?: Leader[]
-  activities?: Activity[]
+  start_time?: string
+  end_time?: string
+  max_members?: number
+  max_teams?: number
+  media: {
+    id: number
+    url: string
+    media_type: 'image' | 'document'
+    name?: string
+    order: number
+  }[]
+
+  // currently not implemented
+  // participants?: number
+  // teams?: number
+  // leaderboard?: Leader[]
+  // activities?: Activity[]
 }
 
 export const useEventStore = defineStore('events', () => {
