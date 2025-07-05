@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { IEvent } from '@/stores/events'
-
+import defaultImage from '@/assets/default.png'
 const props = defineProps<{ event: IEvent }>()
 
 const badge = computed(() => {
@@ -12,12 +12,16 @@ const badge = computed(() => {
     case 'current':
       return { text: 'Идёт сейчас', class: 'bg-red-500 text-white animate-pulse' }
     case 'future':
-      return props.event.type === 'team'
+      return props.event.is_team 
         ? { text: 'Командное', class: 'bg-indigo-100 text-indigo-800' }
         : { text: 'Личное', class: 'bg-green-100 text-green-800' }
     default:
       return { text: '', class: '' }
   }
+})
+
+const images = computed(() => {
+  return props.event.media.filter(m => m.media_type === 'image').map(m => m.url)
 })
 </script>
 
@@ -28,7 +32,7 @@ const badge = computed(() => {
   >
     <!-- Изображение -->
     <div class="w-1/3 md:w-full flex-shrink-0">
-      <img :src="event.imgUrls[0]" :alt="event.title" class="w-full h-full md:h-32 object-cover">
+      <img :src="images[0] || defaultImage" :alt="event.title" class="w-full h-full md:h-32 object-cover">
     </div>
 
     <!-- Контент -->
@@ -43,15 +47,15 @@ const badge = computed(() => {
         </div>
       </div>
       
-      <!-- Активности для текущих событий -->
-      <div v-if="event.state === 'current' && event.activities" class="mt-3 border-t pt-3">
+      <!-- Активности для текущих событий (временно отключено) -->
+      <!-- <div v-if="event.state === 'current' && event.activities" class="mt-3 border-t pt-3">
         <ul class="space-y-2 md:grid md:grid-cols-2 md:gap-2 md:space-y-0">
           <li v-for="activity in event.activities.slice(0, 2)" :key="activity.name" class="flex items-center gap-2 text-sm">
             <span :class="['w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0', activity.color]">{{ activity.icon }}</span>
             <span class="text-gray-700 truncate">{{ activity.name }}</span>
           </li>
         </ul>
-      </div>
+      </div> -->
     </div>
   </RouterLink>
 </template>
