@@ -11,9 +11,9 @@ const AppLayout = () => import('@/components/AppLayout.vue')
 const NotFound = () => import('@/pages/NotFound.vue')
 
 // Новые страницы-панели
-const AdminPanel = () => import('@/pages/panels/AdminPanel.vue')
-const OrganizerPanel = () => import('@/pages/panels/OrganizerPanel.vue')
-const JudgePanel = () => import('@/pages/panels/JudgePanel.vue')
+// const AdminPanel = () => import('@/pages/panels/AdminPanel.vue')
+// const OrganizerPanel = () => import('@/pages/panels/OrganizerPanel.vue')
+// const JudgePanel = () => import('@/pages/panels/JudgePanel.vue')
 
 const routes: Array<RouteRecordRaw> = [
   { 
@@ -33,24 +33,24 @@ const routes: Array<RouteRecordRaw> = [
       { path: 'confirm-email', name: 'ConfirmEmail', component: ConfirmEmail },
       
       // Роуты для панелей управления
-      { 
-        path: 'admin', 
-        name: 'AdminPanel', 
-        component: AdminPanel, 
-        meta: { requiresAuth: true, roles: ['admin'] } 
-      },
-      { 
-        path: 'organizer', 
-        name: 'OrganizerPanel', 
-        component: OrganizerPanel, 
-        meta: { requiresAuth: true, roles: ['admin', 'organizer'] } 
-      },
-      { 
-        path: 'judge', 
-        name: 'JudgePanel', 
-        component: JudgePanel, 
-        meta: { requiresAuth: true, roles: ['admin', 'judge'] } 
-      },
+      // { 
+      //   path: 'admin', 
+      //   name: 'AdminPanel', 
+      //   component: AdminPanel, 
+      //   meta: { requiresAuth: true, roles: ['admin'] } 
+      // },
+      // { 
+      //   path: 'organizer', 
+      //   name: 'OrganizerPanel', 
+      //   component: OrganizerPanel, 
+      //   meta: { requiresAuth: true, roles: ['admin', 'organizer'] } 
+      // },
+      // { 
+      //   path: 'judge', 
+      //   name: 'JudgePanel', 
+      //   component: JudgePanel, 
+      //   meta: { requiresAuth: true, roles: ['admin', 'judge'] } 
+      // },
     ],
   },
   { 
