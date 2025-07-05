@@ -1,51 +1,70 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { fetchEventsApi } from '@/api/events'
 
-export interface Leader {
+interface Media {
   id: number
-  name: string
-  score: number
-  avatarUrl: string
-}
-
-export interface Activity {
-  icon: string
-  name: string
-  color: string
+  url: string
+  media_type: 'image' | 'document'
+  name?: string
+  order: number
 }
 
 export interface IEvent {
   id: number
   title: string
-  type: 'individual' | 'team'
-  imgUrls: string[]
+  is_team: boolean
   date: string
   state: 'future' | 'current' | 'past'
   description: string
-  participants?: number
-  teams?: number
-  leaderboard?: Leader[]
-  activities?: Activity[]
+  start_time?: string
+  end_time?: string
+  max_members?: number
+  max_teams?: number
+  media: Media[]
+
+  // currently not implemented
+  // participants?: number
+  // teams?: number
+  // leaderboard?: Leader[]
+  // activities?: Activity[]
 }
 
 export const useEventStore = defineStore('events', () => {
   const events = ref<IEvent[]>([])
-  const isLoading = ref(false)  
+  const isLoading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchEvents() {
-    if (events.value.length > 0) return
+  const getEventById = computed(() => (id: number) => 
+    events.value.find(event => event.id === id))
+
+  async function fetchEvents(force = false) {
+    if (events.value.length > 0 && !force) return
+    
     isLoading.value = true
     error.value = null
+    
     try {
       events.value = await fetchEventsApi()
     } catch (err: any) {
       error.value = err.message || 'Не удалось загрузить мероприятия'
+      console.error(err)
     } finally {
       isLoading.value = false
     }
   }
 
-  return { events, isLoading, error, fetchEvents }
+  function reset() {
+    events.value = []
+    error.value = null
+  }
+
+  return { 
+    events,
+    isLoading,
+    error,
+    getEventById,
+    fetchEvents,
+    reset
+  }
 })

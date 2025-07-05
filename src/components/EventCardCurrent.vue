@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import defaultImage from '@/assets/default.png'
 import type { IEvent } from '@/stores/events'
 
-defineProps<{ 
+
+const props = defineProps<{ 
   event: IEvent 
 }>()
+
+const images = computed(() => {
+  return props.event.media.filter(m => m.media_type === 'image').map(m => m.url)
+})
 </script>
 
 <template>
@@ -14,7 +21,7 @@ defineProps<{
   >
     <!-- Изображение -->
     <div class="relative">
-      <img :src="event.imgUrls[0]" :alt="event.title" class="w-full h-32 object-cover">
+      <img :src="images[0] || defaultImage" :alt="event.title" class="w-full h-32 object-cover">
       <div class="absolute inset-0 bg-black bg-opacity-10 group-hover:bg-opacity-0 transition-colors duration-300"></div>
     </div>
 
@@ -23,8 +30,8 @@ defineProps<{
       <h3 class="font-bold text-gray-800 text-base truncate mb-1">{{ event.title }}</h3>
       <p class="text-sm text-gray-500 mb-3">{{ event.date }}</p>
       
-      <!-- Виджет лидерборда -->
-      <div v-if="event.leaderboard && event.leaderboard.length > 0">
+      <!-- Виджет лидерборда (временно отключено) -->
+      <!-- <div v-if="event.leaderboard && event.leaderboard.length > 0">
         <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Лидеры сейчас</h4>
         <ul class="space-y-2">
           <li 
@@ -39,7 +46,7 @@ defineProps<{
           </li>
         </ul>
       </div>
-      <p v-else class="text-sm text-gray-400 mt-4">Борьба только начинается!</p>
+      <p v-else class="text-sm text-gray-400 mt-4">Борьба только начинается!</p> -->
     </div>
   </RouterLink>
 </template>
