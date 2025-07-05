@@ -4,26 +4,28 @@ import type { IEvent } from '@/stores/events'
 const API_URL = 'http://62.183.4.195:8000'
 
 export function mapSEventToIEvent(event: any): IEvent {
+  const { id, title, is_team, date, state, description, start_time, end_time, max_members, max_teams, media = [] } = event;
+  
   return {
-    id: event.id,
-    title: event.title,
-    is_team: event.is_team,
-    date: event.date ? new Date(event.date).toLocaleDateString('ru-RU', { 
+    id,
+    title,
+    is_team,
+    date: date ? new Date(date).toLocaleDateString('ru-RU', { 
       year: 'numeric', 
       month: '2-digit', 
       day: '2-digit' 
     }) : 'Дата не указана',
-    state: event.state,
-    description: event.description || '',
-    start_time: event.start_time,
-    end_time: event.end_time,
-    max_members: event.max_members,
-    max_teams: event.max_teams,
-    media: (event.media || []).map((m: any) => ({
+    state,
+    description: description || '',
+    start_time,
+    end_time,
+    max_members,
+    max_teams,
+    media: media.map((m: any) => ({
       id: m.id,
       url: m.url,
       media_type: m.media_type,
-      name: m.name || undefined,
+      name: m.name,
       order: m.order || 0
     }))
   }
