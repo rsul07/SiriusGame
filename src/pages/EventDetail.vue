@@ -123,7 +123,7 @@ const openViewer = (index: number) => {
       </div>
       <div>
         <div v-if="activeSubTab === 'description'">
-          <p class="text-gray-700 leading-relaxed">{{ event.description }}</p>
+          <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ event.description }}</p>
         </div>
         <div v-if="activeSubTab === 'activities'">
           <!-- <ul class="space-y-3">
