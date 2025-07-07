@@ -1,4 +1,4 @@
-<!-- <script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useEventStore, type IEvent } from '@/stores/events';
 import EventCard from '@/components/EventCard.vue';
@@ -23,12 +23,11 @@ const selectEventForEditing = (event: IEvent) => {
 const createNewEvent = () => {
   form.data = {
     title: 'Новое мероприятие',
-    imgUrls: [],
+    media: [],
     date: new Date().toISOString().split('T')[0],
     state: 'future',
     description: '',
-    activities: [],
-    leaderboard: [],
+    // activities: [],
   };
   isCreatingNew.value = true;
   selectedEvent.value = form.data as IEvent;
@@ -40,25 +39,25 @@ const backToSelection = () => {
   isCreatingNew.value = false;
 };
 
-const addActivity = () => {
-  if (!form.data) return;
-  if (!form.data.activities) form.data.activities = [];
-  form.data.activities.push({ icon: '🎉', name: 'Новое событие', color: 'bg-gray-100' });
-};
+// const addActivity = () => {
+//   if (!form.data) return;
+//   if (!form.data.activities) form.data.activities = [];
+//   form.data.activities.push({ icon: '🎉', name: 'Новое событие', color: 'bg-gray-100' });
+// };
 
-const removeActivity = (index: number) => {
-  form.data?.activities?.splice(index, 1);
-};
+// const removeActivity = (index: number) => {
+//   form.data?.activities?.splice(index, 1);
+// };
 
-const addTeam = () => {
-  if (!form.data) return;
-  if (!form.data.leaderboard) form.data.leaderboard = [];
-  form.data.leaderboard.push({ id: Date.now(), name: 'Новая команда', score: 0, avatarUrl: '' });
-};
+// const addTeam = () => {
+//   if (!form.data) return;
+//   if (!form.data.leaderboard) form.data.leaderboard = [];
+//   form.data.leaderboard.push({ id: Date.now(), name: 'Новая команда', score: 0, avatarUrl: '' });
+// };
 
-const removeTeam = (index: number) => {
-  form.data?.leaderboard?.splice(index, 1);
-};
+// const removeTeam = (index: number) => {
+//   form.data?.leaderboard?.splice(index, 1);
+// };
 
 const saveEvent = () => {
   if (isCreatingNew.value) {
@@ -131,10 +130,17 @@ onMounted(() => {
           <div><label class="block text-sm font-medium text-gray-700">Описание</label><textarea v-model="form.data.description" rows="4" class="mt-1 w-full p-2 border rounded-md"></textarea></div>
 
           <div class="grid md:grid-cols-2 gap-6">
-            <div><label class="block text-sm font-medium text-gray-700">URL изображений (каждый с новой строки)</label><textarea :value="form.data.imgUrls?.join('\n')" @input="form.data.imgUrls = ($event.target as HTMLTextAreaElement).value.split('\n')" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea></div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">URL изображений (каждый с новой строки)</label>
+              <textarea 
+                :value="form.data?.media?.map(m => m.url).join('\n') || ''" 
+                rows="3" class="mt-1 w-full p-2 border rounded-md">
+                <!-- @input="form.data?.media = ($event.target as HTMLTextAreaElement).value.split('\n')"  -->
+              </textarea>
+            </div>
             <!-- <div><label class="block text-sm font-medium text-gray-700">URL карты (Yandex, Google)</label><input v-model="form.data.mapUrl" type="text" class="mt-1 w-full p-2 border rounded-md"></div> -->
           </div>
-          <div>
+          <!-- <div>
             <h3 class="font-medium mb-2">События (Activities)</h3>
             <div v-for="(activity, index) in form.data.activities" :key="index" class="flex items-center gap-2 p-2 mb-2 bg-gray-50 rounded"><input type="text" v-model="activity.icon" class="w-10 text-center p-1 bg-white border rounded"><input type="text" v-model="activity.name" class="flex-1 p-1 bg-white border rounded"><button @click="removeActivity(index)" type="button" class="text-red-500 hover:text-red-700">✕</button></div>
             <button @click="addActivity" type="button" class="text-sm text-primary hover:underline">+ Добавить событие</button>
@@ -143,7 +149,7 @@ onMounted(() => {
             <h3 class="font-medium mb-2">Команды и Очки</h3>
             <div v-for="(team, index) in form.data.leaderboard" :key="index" class="flex items-center gap-2 p-2 mb-2 bg-gray-50 rounded"><input type="text" v-model="team.name" class="flex-1 p-1 bg-white border rounded"><input type="number" v-model="team.score" class="w-24 p-1 border rounded-md"><button @click="removeTeam(index)" type="button" class="text-red-500 hover:text-red-700">✕</button></div>
             <button @click="addTeam" type="button" class="text-sm text-primary hover:underline">+ Добавить команду</button>
-          </div>
+          </div> -->
           <div class="flex flex-col md:flex-row gap-4 pt-4 border-t">
             <button type="submit" class="flex-1 px-4 py-2 text-white bg-primary rounded-md hover:opacity-90">Сохранить</button>
           </div>
@@ -151,4 +157,4 @@ onMounted(() => {
       </div>
     </div>
   </div>
-</template> -->
+</template> 
