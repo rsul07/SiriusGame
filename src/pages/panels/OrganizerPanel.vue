@@ -11,6 +11,7 @@ const isCreatingNew = ref(false);
 
 const futureEvents = computed(() => eventStore.events.filter(e => e.state === 'future'));
 const currentEvents = computed(() => eventStore.events.filter(e => e.state === 'current'));
+const pastEvents = computed(() => eventStore.events.filter(e => e.state === 'past'));
 
 const selectEventForEditing = (event: IEvent) => {
   // ИСПОЛЬЗУЕМ JSON.parse/stringify ВМЕСТО structuredClone
@@ -83,21 +84,15 @@ onMounted(() => {
         <button @click="createNewEvent" class="px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700">+ Создать новое</button>
       </div>
       <div class="space-y-6">
-        <div>
-          <h3 class="font-bold text-gray-600 mb-2">Будущие</h3>
+        <div v-for="events in [futureEvents, currentEvents, pastEvents]" :key="events[0]?.id">
+          <h3 class="font-bold text-gray-600 mb-2">{{ ['Будущие', 'Текущие', 'Прошедшие'][[futureEvents, currentEvents, pastEvents].indexOf(events)] }}</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="event in futureEvents" :key="event.id" class="flex flex-col">
+            <div v-for="event in events" :key="event.id" class="flex flex-col">
               <EventCard :event="event" class="flex-grow"/>
               <button @click="selectEventForEditing(event)" class="w-full mt-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Редактировать</button>
             </div>
-          </div>
-        </div>
-        <div>
-          <h3 class="font-bold text-gray-600 mb-2">Текущие</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="event in currentEvents" :key="event.id" class="flex flex-col">
-              <EventCard :event="event" class="flex-grow"/>
-              <button @click="selectEventForEditing(event)" class="w-full mt-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Редактировать</button>
+            <div v-if="events.length === 0" class="col-span-3">
+              <p class="text-gray-600 text-center">Нет таких мероприятий</p>
             </div>
           </div>
         </div>
