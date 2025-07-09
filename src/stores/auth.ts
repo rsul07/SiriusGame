@@ -65,17 +65,23 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(payload: { fullName: string, email: string, password: string }) {
     console.log('Registering user:', payload.email);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // В реальном приложении бэкенд отправит письмо. Мы не авторизуем пользователя.
   }
 
   async function verify2FA(code: string) {
     console.log('Verifying 2FA code:', code);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // В реальном приложении бэкенд отправит письмо. Мы не авторизуем пользователя.
+  }
+  
+  async function joinOrCreateTeam(action: 'join' | 'create', teamInfo: { name: string }): Promise<{ inviteLink: string }> {
+    console.log(`Performing action: ${action} for team: ${teamInfo.name}`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const inviteLink = `https://sirius.game/join?team=${Date.now()}&token=${Math.random().toString(36).substring(2, 10)}`;
+    
+    return { inviteLink };
   }
   
   function logout() {
-    // Убираем confirm() отсюда. Управление теперь только в компоненте.
     user.value = null;
     token.value = null;
     localStorage.removeItem('jwt_token');
@@ -85,6 +91,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   return { 
     token, user, isAuthenticated, userAvatar, registeredEventIds,
-    login, register, logout, setRedirectPath, verify2FA
+    login, register, logout, setRedirectPath, verify2FA, joinOrCreateTeam
   }
 })
