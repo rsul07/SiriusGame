@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { fetchEventsApi } from '@/api/events'
+import { fetchEventsApi, fetchEventByIdApi } from '@/api/events'
 
-// Интерфейсы вынесены для ясности
 export interface Leader {
   id: number
   name: string
@@ -36,7 +35,6 @@ export interface IEvent {
   max_members?: number
   max_teams?: number
   media: Media[]
-  // Раскомментируем, чтобы TS не ругался в других компонентах
   leaderboard?: Leader[]
   activities?: Activity[]
 }
@@ -44,6 +42,7 @@ export interface IEvent {
 export const useEventStore = defineStore('events', () => {
   const events = ref<IEvent[]>([])
   const isLoading = ref(false)
+  const isLoadingDetail = ref(false)
   const error = ref<string | null>(null)
 
   const getEventById = computed(() => {
@@ -58,29 +57,33 @@ export const useEventStore = defineStore('events', () => {
     
     try {
       events.value = await fetchEventsApi()
-      
-      // --- ВРЕМЕННЫЙ БЛОК ДЛЯ ДЕМОНСТРАЦИИ ---
-      // Добавляем мок-данные к данным из API, чтобы было что отображать.
-      // Когда ваш API будет возвращать leaderboard и activities, этот блок можно убрать.
-      if (events.value.length > 0) {
-        events.value[0].leaderboard = [
-            { id: 1, name: 'Елена Васильева', score: 100, avatarUrl: 'https://i.pravatar.cc/150?u=1' },
-            { id: 2, name: 'Иван Грозный', score: 95, avatarUrl: 'https://i.pravatar.cc/150?u=2' },
-            { id: 3, name: 'Мария Кузнецова', score: 92, avatarUrl: 'https://i.pravatar.cc/150?u=3' },
-            { id: 8, name: 'Алексей Петров', score: 88, avatarUrl: 'https://i.pravatar.cc/150?u=8' },
-        ];
-        events.value[0].activities = [
-            { icon: '🏁', name: 'Финальная гонка', color: 'bg-red-100' },
-            { icon: '🛠️', name: 'Тех-питстоп', color: 'bg-blue-100' },
-        ];
-      }
-      // --- КОНЕЦ ВРЕМЕННОГО БЛОКА ---
-
     } catch (err: any) {
       error.value = err.message || 'Не удалось загрузить мероприятия'
       console.error(err)
     } finally {
       isLoading.value = false
+    }
+  }
+
+  async function fetchEventById(id: number): Promise<IEvent | undefined> {
+    isLoadingDetail.value = true;
+    error.value = null;
+    try {
+      const fetchedEvent = await fetchEventByIdApi(id);
+      const index = events.value.findIndex(e => e.id === id);
+
+      if (index !== -1) {
+        events.value[index] = { ...events.value[index], ...fetchedEvent };
+      } else {
+        events.value.push(fetchedEvent);
+      }
+      return events.value.find(e => e.id === id);
+    } catch (err: any) {
+      error.value = err.message || `Не удалось загрузить мероприятие с ID ${id}`;
+      console.error(err);
+      return undefined;
+    } finally {
+      isLoadingDetail.value = false;
     }
   }
 
@@ -92,9 +95,11 @@ export const useEventStore = defineStore('events', () => {
   return { 
     events,
     isLoading,
+    isLoadingDetail,
     error,
     getEventById,
     fetchEvents,
+    fetchEventById,
     reset
   }
 })

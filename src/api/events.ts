@@ -4,7 +4,11 @@ import type { IEvent } from '@/stores/events'
 const API_URL = 'http://62.183.4.195:8000'
 
 export function mapSEventToIEvent(event: any): IEvent {
-  const { id, title, is_team, date, state, description, start_time, end_time, max_members, max_teams, media = [] } = event;
+  const { 
+    id, title, is_team, date, state, 
+    description, start_time, end_time, 
+    max_members, max_teams, media = [] 
+  } = event;
   
   return {
     id,
@@ -16,7 +20,7 @@ export function mapSEventToIEvent(event: any): IEvent {
       day: '2-digit' 
     }) : 'Дата не указана',
     state,
-    description: description || '',
+    description: description || 'Описание отсутствует.',
     start_time,
     end_time,
     max_members,
@@ -31,6 +35,7 @@ export function mapSEventToIEvent(event: any): IEvent {
   }
 }
 
+// Лёгкие события
 export async function fetchEventsApi(): Promise<IEvent[]> {
   try {
     const response = await axios.get(`${API_URL}/events`)
@@ -39,4 +44,15 @@ export async function fetchEventsApi(): Promise<IEvent[]> {
     console.error('Ошибка при загрузке событий:', error)
     return []
   }
+}
+
+// Для тяжёлых по id
+export async function fetchEventByIdApi(id: number): Promise<IEvent>{
+    try {
+      const response = await axios.get(`${API_URL}/events/${id}`);
+      return mapSEventToIEvent(response.data);
+    } catch (error) {
+      console.error(`Ошибка при загрузке события с ID ${id}:`, error);
+      throw new Error('Не удалось загрузить данные мероприятия');
+    }
 }

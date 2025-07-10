@@ -14,6 +14,9 @@ const eventStore = useEventStore()
 const authStore = useAuthStore()
 
 const event = ref<IEvent | null>(null)
+const isLoadingPage = ref(true)
+const errorPage = ref<string | null>(null)
+
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
 const showShareMenu = ref(false)
 const isViewerOpen = ref(false)
@@ -49,15 +52,38 @@ const topThree = computed(() => leaders.value.slice(0, 3))
 const theRest = computed(() => leaders.value.slice(3))
 const imageViewerStyle = computed(() => ({ transform: `rotate(${imageRotation.value}deg)` }))
 
+async function loadEventData(id: string) {
+  isLoadingPage.value = true;
+  errorPage.value = null;
+  const eventId = parseInt(id);
+
+  try {
+    let foundEvent = eventStore.getEventById(eventId);
+    
+    if (!foundEvent || !foundEvent.description) {
+      foundEvent = await eventStore.fetchEventById(eventId);
+    }
+    
+    event.value = foundEvent || null;
+
+    if (!event.value) {
+      throw new Error("Мероприятие не найдено");
+    }
+
+    if (event.value.state === 'current') {
+      activeSubTab.value = 'activities'
+    } else {
+      activeSubTab.value = 'description'
+    }
+  } catch (e: any) {
+    errorPage.value = e.message;
+  } finally {
+    isLoadingPage.value = false;
+  }
+}
+
 onMounted(async () => { await loadEventData(route.params.id as string); })
 watch(() => route.params.id, async (newId) => { if (newId) { await loadEventData(newId as string); } })
-
-async function loadEventData(id: string) {
-  if (eventStore.events.length === 0) { await eventStore.fetchEvents() }
-  const foundEvent = eventStore.getEventById(parseInt(id))
-  event.value = foundEvent || null
-  activeSubTab.value = event.value?.state === 'current' ? 'activities' : 'description'
-}
 
 function handleParticipate() {
   if (!authStore.isAuthenticated) {
@@ -134,10 +160,12 @@ const openViewer = (index: number) => {
 </script>
 
 <template>
-  <div v-if="event" class="bg-bgMain min-h-full">
+  <div v-if="isLoadingPage" class="text-center pt-20">Загрузка данных о мероприятии...</div>
+  <div v-else-if="errorPage" class="text-center pt-20 text-red-500">{{ errorPage }}</div>
+  <div v-else-if="event" class="bg-bgMain min-h-full">
     <div class="relative w-full h-64 bg-gray-300">
       <img :src="eventImages[0] || defaultImage" alt="Event visual" class="w-full h-full object-cover">
-      <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>     
       <button @click.stop="router.back()" class="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
       <button @click.stop="showShareMenu = true" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684Zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684Z" /></svg></button>
       <button v-if="eventImages.length > 0" @click.stop="openViewer(0)" class="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors">
@@ -149,12 +177,12 @@ const openViewer = (index: number) => {
       <h1 class="text-3xl font-bold mb-4">{{ event.title }}</h1>
       <div class="flex border-b mb-4">
         <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
-        <button @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
-        <button v-if="event.state !== 'future'" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
+        <button v-if="event.activities && event.activities.length > 0" @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
+        <button v-if="event.state !== 'future' && event.leaderboard && event.leaderboard.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
       </div>
       <div>
         <div v-if="activeSubTab === 'description'"><p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ event.description }}</p></div>
-        <div v-if="activeSubTab === 'activities'"></div> 
+        <div v-if="activeSubTab === 'activities'"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div> 
         <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
           <div class="mt-8">
@@ -197,66 +225,25 @@ const openViewer = (index: number) => {
             <button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button>
           </div>
         </div>
-
         <form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction">
           <h3 class="text-lg font-bold mb-4">Создать команду</h3>
-          <div>
-            <label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label>
-            <input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md">
-          </div>
-          <div class="flex justify-end gap-4 mt-6">
-            <button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button>
-            <button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button>
-          </div>
+          <div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div>
+          <div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div>
         </form>
-        
         <div v-if="teamModalStep === 'list'">
             <h3 class="text-lg font-bold mb-4">Вступить в команду</h3>
             <p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p>
-            <div class="border rounded-lg">
-              <input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary">
-              <ul class="space-y-1 max-h-64 overflow-y-auto p-2">
-                  <li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                      <div>
-                          <p class="font-semibold">{{ team.name }}</p>
-                          <p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p>
-                      </div>
-                      <button 
-                          @click="joinSelectedTeam(team.name)" 
-                          :disabled="team.members >= team.maxMembers"
-                          class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                      >
-                          Вступить
-                      </button>
-                  </li>
-                  <li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">
-                      Команды не найдены.
-                  </li>
-              </ul>
-            </div>
-             <div class="flex justify-end gap-4 mt-6">
-                <button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button>
-            </div>
+            <div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div>
+             <div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div>
         </div>
-
-        <div v-if="teamModalStep === 'link'">
-          <h3 class="text-lg font-bold mb-4">Команда создана!</h3>
-          <p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями, чтобы они могли присоединиться.</p>
-          <input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4">
-          <div class="flex gap-4">
-            <button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button>
-            <button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button>
-          </div>
-        </div>
+        <div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div>
       </div>
     </Modal>
-
+    
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="isViewerOpen" @click.self="isViewerOpen = false" class="fixed inset-0 bg-white/50 dark:bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <Transition name="image-fade" mode="out-in">
-            <img :key="currentImageIndex" :src="eventImages[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg">
-          </Transition>
+          <Transition name="image-fade" mode="out-in"><img :key="currentImageIndex" :src="eventImages[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg"></Transition>
           <div class="absolute top-4 left-4 flex gap-2"><button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/></svg></button></div>
           <button @click="isViewerOpen = false" class="h-10 w-10 flex items-center justify-center absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
           <button v-if="eventImages.length > 1" @click.stop="prevImage" class="h-10 w-10 flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
