@@ -1,58 +1,40 @@
 import axios from 'axios'
-import type { IEvent } from '@/stores/events'
+import type { IEventCard, IEventDetail } from '@/types'
 
 const API_URL = 'http://62.183.4.195:8000'
 
-export function mapSEventToIEvent(event: any): IEvent {
-  const { 
-    id, title, is_team, date, state, 
-    description, start_time, end_time, 
-    max_members, max_teams, media = [] 
-  } = event;
-  
+// Общая функция маппинга
+function mapEventData(eventData: any) {
   return {
-    id,
-    title,
-    is_team,
-    date: date ? new Date(date).toLocaleDateString('ru-RU', { 
+    ...eventData,
+    date: eventData.date ? new Date(eventData.date).toLocaleDateString('ru-RU', { 
       year: 'numeric', 
       month: '2-digit', 
       day: '2-digit' 
     }) : 'Дата не указана',
-    state,
-    description: description || 'Описание отсутствует.',
-    start_time,
-    end_time,
-    max_members,
-    max_teams,
-    media: media.map((m: any) => ({
-      id: m.id,
-      url: m.url,
-      media_type: m.media_type,
-      name: m.name,
-      order: m.order || 0
-    }))
-  }
+    description: eventData.description || 'Описание отсутствует.',
+    media: eventData.media || [],
+    leaderboard: eventData.leaderboard || [],
+    activities: eventData.activities || [],
+  };
 }
 
-// Лёгкие события
-export async function fetchEventsApi(): Promise<IEvent[]> {
+// Возвращает массив "легких" карточек
+export async function fetchEventsApi(): Promise<IEventCard[]> {
   try {
     const response = await axios.get(`${API_URL}/events`)
-    return response.data.map(mapSEventToIEvent)
+    return response.data.map(mapEventData) // Просто маппим, TypeScript сам возьмет нужные поля
   } catch (error) {
-    console.error('Ошибка при загрузке событий:', error)
-    return []
+    throw new Error('Не удалось загрузить список мероприятий');
   }
 }
 
-// Для тяжёлых по id
-export async function fetchEventByIdApi(id: number): Promise<IEvent>{
+// Возвращает одно "тяжелое" событие
+export async function fetchEventByIdApi(id: number): Promise<IEventDetail> {
     try {
       const response = await axios.get(`${API_URL}/events/${id}`);
-      return mapSEventToIEvent(response.data);
+      return mapEventData(response.data);
     } catch (error) {
-      console.error(`Ошибка при загрузке события с ID ${id}:`, error);
       throw new Error('Не удалось загрузить данные мероприятия');
     }
 }

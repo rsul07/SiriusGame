@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useEventStore, type IEvent } from '@/stores/events'
+import { useEventStore, type IEventDetail, type Media } from '@/stores/events' // <-- Импортируем только IEventDetail
 import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
@@ -13,7 +13,7 @@ const router = useRouter()
 const eventStore = useEventStore()
 const authStore = useAuthStore()
 
-const event = ref<IEvent | null>(null)
+const event = ref<IEventDetail | null>(null) // <-- Тип теперь IEventDetail
 const isLoadingPage = ref(true)
 const errorPage = ref<string | null>(null)
 
@@ -39,12 +39,8 @@ const foundTeams = ref([
 
 const teamSearchQuery = ref('')
 const filteredTeams = computed(() => {
-  if (!teamSearchQuery.value) {
-    return foundTeams.value
-  }
-  return foundTeams.value.filter(team => 
-    team.name.toLowerCase().includes(teamSearchQuery.value.toLowerCase())
-  )
+  if (!teamSearchQuery.value) { return foundTeams.value }
+  return foundTeams.value.filter(team => team.name.toLowerCase().includes(teamSearchQuery.value.toLowerCase()))
 })
 
 const leaders = computed(() => event.value?.leaderboard || [])
@@ -52,29 +48,24 @@ const topThree = computed(() => leaders.value.slice(0, 3))
 const theRest = computed(() => leaders.value.slice(3))
 const imageViewerStyle = computed(() => ({ transform: `rotate(${imageRotation.value}deg)` }))
 
+const eventImages = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'image').map((m: Media) => m.url) : []);
+const eventDocuments = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'document') : []);
+
 async function loadEventData(id: string) {
   isLoadingPage.value = true;
   errorPage.value = null;
   const eventId = parseInt(id);
 
   try {
-    let foundEvent = eventStore.getEventById(eventId);
+    const foundEvent = await eventStore.fetchEventById(eventId);
     
-    if (!foundEvent || !foundEvent.description) {
-      foundEvent = await eventStore.fetchEventById(eventId);
-    }
-    
-    event.value = foundEvent || null;
-
-    if (!event.value) {
+    if (!foundEvent) {
       throw new Error("Мероприятие не найдено");
     }
-
-    if (event.value.state === 'current') {
-      activeSubTab.value = 'activities'
-    } else {
-      activeSubTab.value = 'description'
-    }
+    
+    event.value = foundEvent;
+    
+    activeSubTab.value = event.value.state === 'current' ? 'activities' : 'description'
   } catch (e: any) {
     errorPage.value = e.message;
   } finally {
@@ -115,9 +106,6 @@ async function handleTeamAction() {
       const result = await authStore.joinOrCreateTeam(teamAction.value, teamForm);
       teamInviteLink.value = result.inviteLink;
       teamModalStep.value = 'link';
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      teamModalStep.value = 'list';
     }
   } catch(e) {
     alert('Произошла ошибка')
@@ -148,8 +136,6 @@ async function copyShareLink() {
   }
 }
 
-const eventImages = computed(() => event.value ? event.value.media.filter(m => m.media_type === 'image').map(m => m.url) : []);
-const eventDocuments = computed(() => event.value ? event.value.media.filter(m => m.media_type === 'document') : []);
 const nextImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length }
 const prevImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length }
 const rotateImage = () => { imageRotation.value += 90 }
@@ -161,12 +147,12 @@ const openViewer = (index: number) => {
 </script>
 
 <template>
-  <div v-if="isLoadingPage" class="text-center pt-20">Загрузка данных о мероприятии...</div>
-  <div v-else-if="errorPage" class="text-center pt-20 text-red-500">{{ errorPage }}</div>
+  <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка данных о мероприятии...</div>
+  <div v-else-if="errorPage" class="flex items-center justify-center h-full text-red-500 p-4 text-center">{{ errorPage }}</div>
   <div v-else-if="event" class="bg-bgMain min-h-full">
     <div class="relative w-full h-64 bg-gray-300">
       <img :src="eventImages[0] || defaultImage" alt="Event visual" class="w-full h-full object-cover">
-      <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>     
+      <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
       <button @click.stop="router.back()" class="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
       <button @click.stop="showShareMenu = true" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684Zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684Z" /></svg></button>
       <button v-if="eventImages.length > 0" @click.stop="openViewer(0)" class="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors">
@@ -189,101 +175,28 @@ const openViewer = (index: number) => {
             <ul class="space-y-3">
               <li v-for="doc in eventDocuments" :key="doc.id">
                 <a :href="doc.url" target="_blank" download class="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm hover:shadow-md hover:bg-gray-50 transition-all">
-                  <div class="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-gray-800 truncate">{{ doc.name || 'Документ' }}</p>
-                    <p class="text-sm text-gray-500">Нажмите, чтобы скачать</p>
-                  </div>
-                  <div class="flex-shrink-0">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                  </div>
+                  <div class="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center"><svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
+                  <div class="flex-1 min-w-0"><p class="font-semibold text-gray-800 truncate">{{ doc.name || 'Документ' }}</p><p class="text-sm text-gray-500">Нажмите, чтобы скачать</p></div>
+                  <div class="flex-shrink-0"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></div>
                 </a>
               </li>
             </ul>
           </div>
         </div>
-        <div v-if="activeSubTab === 'activities'"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div> 
-        <div v-if="activeSubTab === 'leaderboard'">
+        <div v-if="activeSubTab === 'activities' && event.activities"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div>
+        <div v-if="activeSubTab === 'leaderboard' && event.leaderboard">
           <LeaderboardPedestal :leaders="topThree" />
-          <div class="mt-8">
-            <ul class="space-y-2">
-              <li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm">
-                <span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span>
-                <img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3">
-                <span class="flex-1 font-medium">{{ leader.name }}</span>
-                <span class="font-bold">{{ leader.score }}</span>
-              </li>
-            </ul>
-          </div>
+          <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
         </div>
       </div>
-      
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
-
     <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
-      <div class="max-w-md mx-auto">
-        <div class="flex justify-between items-center mb-4 text-center">
-          <div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div>
-          <div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ event.start_time }}</p></div>
-          <div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || 'Неограничено' }}</p></div>
-          <div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || 'Неограничено' }}</p></div>
-        </div>
-        <button @click="handleParticipate" class="w-full bg-primary text-white font-bold py-3 rounded-lg text-lg hover:opacity-90 transition-opacity">{{ authStore.isAuthenticated ? 'Участвовать' : 'Войти, чтобы участвовать' }}</button>
-      </div>
+      <div class="max-w-md mx-auto"><div class="flex justify-between items-center mb-4 text-center"><div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div><div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ event.start_time }}</p></div><div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || 'Неограничено' }}</p></div><div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || 'Неограничено' }}</p></div></div><button @click="handleParticipate" class="w-full bg-primary text-white font-bold py-3 rounded-lg text-lg hover:opacity-90 transition-opacity">{{ authStore.isAuthenticated ? 'Участвовать' : 'Войти, чтобы участвовать' }}</button></div>
     </footer>
-
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
-    
-    <Modal :show="showTeamModal" @close="showTeamModal = false">
-      <div class="p-6">
-        <div v-if="teamModalStep === 'choice'">
-          <h3 class="text-lg font-bold mb-4">Командное мероприятие</h3>
-          <p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p>
-          <div class="flex flex-col gap-4">
-            <button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button>
-            <button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button>
-          </div>
-        </div>
-        <form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction">
-          <h3 class="text-lg font-bold mb-4">Создать команду</h3>
-          <div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div>
-          <div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div>
-        </form>
-        <div v-if="teamModalStep === 'list'">
-            <h3 class="text-lg font-bold mb-4">Вступить в команду</h3>
-            <p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p>
-            <div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div>
-             <div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div>
-        </div>
-        <div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div>
-      </div>
-    </Modal>
-    
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="isViewerOpen" @click.self="isViewerOpen = false" class="fixed inset-0 bg-white/50 dark:bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <Transition name="image-fade" mode="out-in"><img :key="currentImageIndex" :src="eventImages[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg"></Transition>
-          <div class="absolute top-4 left-4 flex gap-2"><button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/></svg></button></div>
-          <button @click="isViewerOpen = false" class="h-10 w-10 flex items-center justify-center absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-          <button v-if="eventImages.length > 1" @click.stop="prevImage" class="h-10 w-10 flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
-          <button v-if="eventImages.length > 1" @click.stop="nextImage" class="h-10 w-10 flex items-center justify-center absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
-        </div>
-      </Transition>
-    </Teleport>
+    <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
+    <Teleport to="body"><Transition name="modal-fade"><div v-if="isViewerOpen" @click.self="isViewerOpen = false" class="fixed inset-0 bg-white/50 dark:bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"><Transition name="image-fade" mode="out-in"><img :key="currentImageIndex" :src="eventImages[currentImageIndex]" :style="imageViewerStyle" class="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-300 shadow-2xl rounded-lg"></Transition><div class="absolute top-4 left-4 flex gap-2"><button @click="rotateImage" class="h-10 w-10 flex items-center justify-center text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M10 7L9 6L11.2929 3.70711L10.8013 3.21553C10.023 2.43724 8.96744 2 7.86677 2C4.63903 2 2 4.68015 2 7.93274C2 11.2589 4.69868 14 8 14C9.53708 14 11.0709 13.4144 12.2426 12.2426L13.6569 13.6569C12.095 15.2188 10.0458 16 8 16C3.56933 16 0 12.3385 0 7.93274C0 3.60052 3.50968 0 7.86677 0C9.49787 0 11.0622 0.647954 12.2155 1.80132L12.7071 2.29289L15 0L16 1V7H10Z"/></svg></button></div><button @click="isViewerOpen = false" class="h-10 w-10 flex items-center justify-center absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button><button v-if="eventImages.length > 1" @click.stop="prevImage" class="h-10 w-10 flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button><button v-if="eventImages.length > 1" @click.stop="nextImage" class="h-10 w-10 flex items-center justify-center absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button></div></Transition></Teleport>
   </div>
-  <div v-else class="text-center pt-20">Загрузка...</div>
+  <div v-else class="text-center pt-20">Мероприятие не найдено.</div>
 </template>
-
-<style scoped>
-.image-fade-enter-active,
-.image-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.image-fade-enter-from,
-.image-fade-leave-to {
-  opacity: 0;
-}
-</style>
