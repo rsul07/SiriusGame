@@ -149,6 +149,7 @@ async function copyShareLink() {
 }
 
 const eventImages = computed(() => event.value ? event.value.media.filter(m => m.media_type === 'image').map(m => m.url) : []);
+const eventDocuments = computed(() => event.value ? event.value.media.filter(m => m.media_type === 'document') : []);
 const nextImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length }
 const prevImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length }
 const rotateImage = () => { imageRotation.value += 90 }
@@ -181,7 +182,28 @@ const openViewer = (index: number) => {
         <button v-if="event.state !== 'future' && event.leaderboard && event.leaderboard.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
       </div>
       <div>
-        <div v-if="activeSubTab === 'description'"><p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ event.description }}</p></div>
+        <div v-if="activeSubTab === 'description'">
+          <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ event.description }}</p>
+          <div v-if="eventDocuments.length > 0" class="mt-8">
+            <h3 class="text-lg font-bold mb-3">Материалы для скачивания</h3>
+            <ul class="space-y-3">
+              <li v-for="doc in eventDocuments" :key="doc.id">
+                <a :href="doc.url" target="_blank" download class="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm hover:shadow-md hover:bg-gray-50 transition-all">
+                  <div class="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 truncate">{{ doc.name || 'Документ' }}</p>
+                    <p class="text-sm text-gray-500">Нажмите, чтобы скачать</p>
+                  </div>
+                  <div class="flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
         <div v-if="activeSubTab === 'activities'"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div> 
         <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
