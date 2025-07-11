@@ -15,7 +15,7 @@ const activeSettingsTab = ref<'personal' | 'security'>('personal');
 const loginStep = ref<'credentials' | '2fa'>('credentials');
 const copyIdText = ref('Копировать ID')
 
-const loginForm = reactive({ email: '', password: '' });
+const loginForm = reactive({ loginIdentifier: '', password: '' });
 const loginIsLoading = ref(false);
 const loginError = ref<string|null>(null);
 const twoFaForm = reactive({ code: '' });
@@ -38,30 +38,19 @@ const registeredEvents = computed(() => eventStore.events.filter(event => authSt
 const panelLink = computed(() => {
   if (!authStore.user) return null;
   switch (authStore.user.role) {
-    case 'admin':
-      return { name: 'Панель Администратора', routeName: 'AdminPanel' };
-    case 'organizer':
-      return { name: 'Панель Организатора', routeName: 'OrganizerPanel' };
-    case 'judge':
-      return { name: 'Панель Судьи', routeName: 'JudgePanel' };
-    default:
-      return null;
+    case 'admin': return { name: 'Панель Администратора', routeName: 'AdminPanel' };
+    case 'organizer': return { name: 'Панель Организатора', routeName: 'OrganizerPanel' };
+    case 'judge': return { name: 'Панель Судьи', routeName: 'JudgePanel' };
+    default: return null;
   }
 });
 
 const copyUserId = async () => {
   if (!authStore.user?.id) return;
   const success = await copyToClipboard(authStore.user.id);
-  
-  if (success) {
-    copyIdText.value = 'Скопировано!';
-  } else {
-    copyIdText.value = 'Ошибка';
-  }
-  
-  setTimeout(() => {
-    copyIdText.value = 'Копировать ID';
-  }, 2000);
+  if (success) { copyIdText.value = 'Скопировано!'; } 
+  else { copyIdText.value = 'Ошибка'; }
+  setTimeout(() => { copyIdText.value = 'Копировать ID'; }, 2000);
 };
 
 const handleLogin = async () => {
@@ -156,7 +145,19 @@ onMounted(() => { eventStore.fetchEvents(); });
     <!-- VIEW ДЛЯ ГОСТЯ -->
     <div v-else>
       <div class="bg-white p-8 rounded-lg shadow-md mt-10">
-        <form v-if="loginStep === 'credentials'" @submit.prevent="handleLogin" class="space-y-4"><h1 class="text-2xl font-bold text-center mb-6">Вход в профиль</h1><div><label for="login-email" class="block text-sm font-medium text-gray-700">ID пользователя</label><input v-model="loginForm.email" type="text" id="login-email" required autocomplete="username" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"></div><div><label for="login-password" class="block text-sm font-medium text-gray-700">Пароль</label><input v-model="loginForm.password" type="password" id="login-password" required autocomplete="current-password" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"></div><p v-if="loginError" class="text-sm text-red-600 pt-2">{{ loginError }}</p><button type="submit" :disabled="loginIsLoading" class="w-full py-2 px-4 text-white bg-primary rounded-md disabled:bg-gray-400">Войти</button></form>
+        <form v-if="loginStep === 'credentials'" @submit.prevent="handleLogin" class="space-y-4">
+          <h1 class="text-2xl font-bold text-center mb-6">Вход в профиль</h1>
+          <div>
+            <label for="login-id" class="block text-sm font-medium text-gray-700">Email или телефон</label>
+            <input v-model="loginForm.loginIdentifier" type="text" id="login-id" required autocomplete="username" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
+          </div>
+          <div>
+            <label for="login-password" class="block text-sm font-medium text-gray-700">Пароль</label>
+            <input v-model="loginForm.password" type="password" id="login-password" required autocomplete="current-password" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
+          </div>
+          <p v-if="loginError" class="text-sm text-red-600 pt-2">{{ loginError }}</p>
+          <button type="submit" :disabled="loginIsLoading" class="w-full py-2 px-4 text-white bg-primary rounded-md disabled:bg-gray-400">Войти</button>
+        </form>
         <form v-if="loginStep === '2fa'" @submit.prevent="handle2FA" class="space-y-4"><h2 class="text-xl font-bold text-center mb-2">Подтверждение входа</h2><p class="text-center text-sm text-gray-600 mb-4">Мы отправили код на вашу почту.</p><div><label for="2fa-code" class="block text-sm font-medium text-gray-700">Код подтверждения</label><input v-model="twoFaForm.code" type="text" id="2fa-code" required class="mt-1 w-full text-center tracking-[0.5em] text-lg px-3 py-2 border border-gray-300 rounded-md"></div><p v-if="loginError" class="text-sm text-red-600 pt-2">{{ loginError }}</p><button type="submit" :disabled="loginIsLoading" class="w-full py-2 px-4 text-white bg-primary rounded-md disabled:bg-gray-400">Подтвердить</button></form>
         <div class="mt-6 text-center"><p class="text-sm text-gray-600">Нет аккаунта? <RouterLink :to="{ name: 'Register' }" class="font-medium text-primary hover:underline">Зарегистрируйтесь</RouterLink></p></div>
       </div>
