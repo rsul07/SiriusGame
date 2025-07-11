@@ -1,6 +1,19 @@
 export interface Media { id: number; url: string; media_type: 'image' | 'document'; name?: string; order: number }
-export interface User { /* ... */ }
 export interface Leader { id: number; name: string; score: number; avatarUrl: string }
+
+export interface User {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string; 
+  role: 'admin' | 'organizer' | 'judge' | 'user';
+  avatarUrl?: string;
+  height?: number;
+  weight?: number;
+  birthday?: string;
+  gender?: 'male' | 'female';
+  is2FAEnabled?: boolean;
+}
 
 export interface Activity {
   id: number;
@@ -14,7 +27,6 @@ export interface Activity {
   start_dt?: string | null;
   end_dt?: string | null; 
 }
-
 
 // "Легкий" интерфейс для карточек, как его отдает API
 export interface IEventCard {
