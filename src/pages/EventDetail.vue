@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useEventStore, type IEventDetail, type Media } from '@/stores/events' // <-- Импортируем только IEventDetail
+import { useEventStore, type IEventDetail, type Media, type Activity } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
@@ -13,10 +13,9 @@ const router = useRouter()
 const eventStore = useEventStore()
 const authStore = useAuthStore()
 
-const event = ref<IEventDetail | null>(null) // <-- Тип теперь IEventDetail
+const event = ref<IEventDetail | null>(null)
 const isLoadingPage = ref(true)
 const errorPage = ref<string | null>(null)
-
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
 const showShareMenu = ref(false)
 const isViewerOpen = ref(false)
@@ -35,6 +34,8 @@ const foundTeams = ref([
   { id: 1, name: 'CyberDudes', members: 3, maxMembers: 5 },
   { id: 2, name: 'RoboFriends', members: 5, maxMembers: 5 },
   { id: 3, name: 'TechnoWarriors', members: 2, maxMembers: 5 },
+  { id: 4, name: 'Code Ninjas', members: 4, maxMembers: 5 },
+  { id: 5, name: 'Data Dragons', members: 1, maxMembers: 5 },
 ])
 
 const teamSearchQuery = ref('')
@@ -50,6 +51,8 @@ const imageViewerStyle = computed(() => ({ transform: `rotate(${imageRotation.va
 
 const eventImages = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'image').map((m: Media) => m.url) : []);
 const eventDocuments = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'document') : []);
+const scoreableActivities = computed(() => event.value?.activities?.filter((a: Activity) => a.is_scoreable) || [])
+const informationalActivities = computed(() => event.value?.activities?.filter((a: Activity) => !a.is_scoreable) || [])
 
 async function loadEventData(id: string) {
   isLoadingPage.value = true;
@@ -57,7 +60,7 @@ async function loadEventData(id: string) {
   const eventId = parseInt(id);
 
   try {
-    const foundEvent = await eventStore.fetchEventById(eventId);
+    const foundEvent = await eventStore.fetchEventById(eventId, true);
     
     if (!foundEvent) {
       throw new Error("Мероприятие не найдено");
@@ -147,7 +150,7 @@ const openViewer = (index: number) => {
 </script>
 
 <template>
-  <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка данных о мероприятии...</div>
+  <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка...</div>
   <div v-else-if="errorPage" class="flex items-center justify-center h-full text-red-500 p-4 text-center">{{ errorPage }}</div>
   <div v-else-if="event" class="bg-bgMain min-h-full">
     <div class="relative w-full h-64 bg-gray-300">
@@ -183,12 +186,53 @@ const openViewer = (index: number) => {
             </ul>
           </div>
         </div>
-        <div v-if="activeSubTab === 'activities' && event.activities"><ul class="space-y-3 mb-4"><li v-for="activity in event.activities" :key="activity.name" class="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm"><span :class="['w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0', activity.color]">{{ activity.icon }}</span><span class="font-medium text-gray-800">{{ activity.name }}</span></li></ul></div>
-        <div v-if="activeSubTab === 'leaderboard' && event.leaderboard">
+        <div v-if="activeSubTab === 'activities'" class="space-y-4">
+          <!-- Оцениваемые события -->
+          <div v-if="scoreableActivities.length > 0">
+            <h3 class="text-lg font-bold mb-3">Оцениваемые</h3>
+            <ul class="space-y-3">
+              <li v-for="activity in scoreableActivities" :key="activity.id" 
+                   class="flex items-start gap-4 p-4 rounded-lg shadow-sm border"
+                   :class="activity.is_versus ? 'bg-primary/5 border-primary/20' : 'bg-white border-transparent'">
+                
+                <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '🏆' }}</span>
+                
+                <!-- ИСПРАВЛЕНИЕ: Добавлен min-w-0 для корректного переноса текста -->
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
+                  <div v-if="activity.is_versus" class="mt-1">
+                    <span class="text-xs font-bold text-white bg-primary px-2 py-0.5 rounded-full">VS</span>
+                  </div>
+                </div>
+
+                <div v-if="activity.max_score" class="flex-shrink-0 text-right w-20">
+                  <p class="text-2xl font-bold text-primary">{{ activity.max_score }}</p>
+                  <p class="text-xs text-gray-500 -mt-1">очков</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Информационные события -->
+          <div v-if="informationalActivities.length > 0">
+            <h3 class="text-lg font-bold mb-3">Информационные</h3>
+            <ul class="space-y-3">
+              <li v-for="activity in informationalActivities" :key="activity.id" class="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm">
+                <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '📢' }}</span>
+                <!-- ИСПРАВЛЕНИЕ: Добавлен min-w-0 -->
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
           <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
         </div>
       </div>
+      
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
     <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
@@ -200,3 +244,14 @@ const openViewer = (index: number) => {
   </div>
   <div v-else class="text-center pt-20">Мероприятие не найдено.</div>
 </template>
+
+<style scoped>
+.image-fade-enter-active,
+.image-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.image-fade-enter-from,
+.image-fade-leave-to {
+  opacity: 0;
+}
+</style>
