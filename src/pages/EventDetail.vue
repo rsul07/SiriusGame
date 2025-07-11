@@ -56,7 +56,7 @@ const informationalActivities = computed(() => event.value?.activities?.filter((
 
 const formatTimeRange = (start?: string | null, end?: string | null) => {
   if (!start) return '';
-  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
   const startTime = new Date(start).toLocaleTimeString('ru-RU', options);
   if (!end) {
     return `в ${startTime}`; // Изменено для более короткой версии
@@ -78,7 +78,7 @@ const formatTime = (dateStr?: string | null, timeStr?: string | null) => {
   if (isNaN(dateObj.getTime())) return ''; // Проверка на невалидную дату
 
   // Форматируем в HH:MM
-  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
   return dateObj.toLocaleTimeString('ru-RU', options);
 }
 
@@ -278,7 +278,7 @@ const openViewer = (index: number) => {
           
           <div v-if="event.start_time">
             <p class="text-sm text-gray-500">Начало</p>
-            <p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }}</p>
+            <p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }} по МСК</p>
           </div>
           
           <div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || '∞' }}</p></div>
