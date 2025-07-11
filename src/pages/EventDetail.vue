@@ -54,6 +54,20 @@ const eventDocuments = computed(() => event.value ? event.value.media.filter((m:
 const scoreableActivities = computed(() => event.value?.activities?.filter((a: Activity) => a.is_scoreable) || [])
 const informationalActivities = computed(() => event.value?.activities?.filter((a: Activity) => !a.is_scoreable) || [])
 
+const formatTimeRange = (start?: string | null, end?: string | null) => {
+  if (!start) return '';
+  
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+  const startTime = new Date(start).toLocaleTimeString('ru-RU', options);
+  
+  if (!end) {
+    return `Начало в ${startTime}`;
+  }
+  
+  const endTime = new Date(end).toLocaleTimeString('ru-RU', options);
+  return `${startTime} - ${endTime}`;
+}
+
 async function loadEventData(id: string) {
   isLoadingPage.value = true;
   errorPage.value = null;
@@ -186,7 +200,7 @@ const openViewer = (index: number) => {
             </ul>
           </div>
         </div>
-        <div v-if="activeSubTab === 'activities'" class="space-y-4">
+        <div v-if="activeSubTab === 'activities'" class="space-y-6">
           <!-- Оцениваемые события -->
           <div v-if="scoreableActivities.length > 0">
             <h3 class="text-lg font-bold mb-3">Оцениваемые</h3>
@@ -197,10 +211,14 @@ const openViewer = (index: number) => {
                 
                 <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '🏆' }}</span>
                 
-                <!-- ИСПРАВЛЕНИЕ: Добавлен min-w-0 для корректного переноса текста -->
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
-                  <div v-if="activity.is_versus" class="mt-1">
+                  <!-- Блок с временем -->
+                  <div v-if="activity.start_dt" class="flex items-center gap-1.5 mt-2 text-sm text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>{{ formatTimeRange(activity.start_dt, activity.end_dt) }}</span>
+                  </div>
+                  <div v-if="activity.is_versus" class="mt-2">
                     <span class="text-xs font-bold text-white bg-primary px-2 py-0.5 rounded-full">VS</span>
                   </div>
                 </div>
@@ -219,9 +237,13 @@ const openViewer = (index: number) => {
             <ul class="space-y-3">
               <li v-for="activity in informationalActivities" :key="activity.id" class="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm">
                 <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '📢' }}</span>
-                <!-- ИСПРАВЛЕНИЕ: Добавлен min-w-0 -->
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
+                  <!-- Блок с временем -->
+                  <div v-if="activity.start_dt" class="flex items-center gap-1.5 mt-2 text-sm text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>{{ formatTimeRange(activity.start_dt, activity.end_dt) }}</span>
+                  </div>
                 </div>
               </li>
             </ul>

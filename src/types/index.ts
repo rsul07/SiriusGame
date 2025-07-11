@@ -12,7 +12,7 @@ export interface Activity {
   is_versus: boolean;
   max_score?: number | null;
   start_dt?: string | null;
-  end_dt?: string | null;
+  end_dt?: string | null; 
 }
 
 
