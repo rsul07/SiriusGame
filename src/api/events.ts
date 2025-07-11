@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { IEventCard, IEventDetail } from '@/types'
 
-const API_URL = 'http://62.183.4.195:8000'
+const API_URL = 'https://siriusgames.ru/api'
 
 // Общая функция маппинга
 function mapEventData(eventData: any) {
