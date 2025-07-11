@@ -1,7 +1,20 @@
-export interface Leader { id: number; name: string; score: number; avatarUrl: string }
-export interface Activity { icon: string; name: string; color: string }
 export interface Media { id: number; url: string; media_type: 'image' | 'document'; name?: string; order: number }
 export interface User { /* ... */ }
+export interface Leader { id: number; name: string; score: number; avatarUrl: string }
+
+export interface Activity {
+  id: number;
+  name: string;
+  icon?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_scoreable: boolean;
+  is_versus: boolean;
+  max_score?: number | null;
+  start_dt?: string | null;
+  end_dt?: string | null; 
+}
+
 
 // "Легкий" интерфейс для карточек, как его отдает API
 export interface IEventCard {
