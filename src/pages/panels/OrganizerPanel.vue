@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
-import { useEventStore, type IEvent } from '@/stores/events';
+import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
 import EventCard from '@/components/EventCard.vue';
 
 const eventStore = useEventStore();
 
-const selectedEvent = ref<IEvent | null>(null);
-const form = reactive<{ data: Partial<IEvent> | null }>({ data: null });
+const selectedEvent = ref<IEventDetail | null>(null);
+const form = reactive<{ data: Partial<IEventDetail> | null }>({ data: null });
 const isTeam = computed({
   get: () => !!form.data?.is_team,
   set: (val: boolean) => {
@@ -33,25 +33,29 @@ const futureEvents = computed(() => eventStore.events.filter(e => e.state === 'f
 const currentEvents = computed(() => eventStore.events.filter(e => e.state === 'current'));
 const pastEvents = computed(() => eventStore.events.filter(e => e.state === 'past'));
 
-const selectEventForEditing = (event: IEvent) => {
+const selectEventForEditing = async (card: IEventCard) => {
   // ИСПОЛЬЗУЕМ JSON.parse/stringify ВМЕСТО structuredClone
   // Это гарантированно создаст чистую, глубокую копию объекта данных
-  form.data = JSON.parse(JSON.stringify(event));
-  isCreatingNew.value = false;
-  selectedEvent.value = event;
+    const full = await eventStore.fetchEventById(card.id)
+    if (!full) return
+    form.data = JSON.parse(JSON.stringify(full))   // deep copy
+    selectedEvent.value = full
+    isCreatingNew.value = false
 };
 
 const createNewEvent = () => {
   form.data = {
     title: 'Новое мероприятие',
-    media: [],
+    description: 'Описание мероприятия (сюда можно добавить правила, дополнительные условия, и т.д.)',
     date: new Date().toISOString().split('T')[0],
-    state: 'future',
-    description: '',
-    // activities: [],
+    is_team: false,
+    max_members: 1,
+    max_teams: 1,
+    media: [],
+    activities: [],
   };
   isCreatingNew.value = true;
-  selectedEvent.value = form.data as IEvent;
+  selectedEvent.value = form.data as IEventDetail;
 };
 
 const backToSelection = () => {
