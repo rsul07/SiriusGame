@@ -56,16 +56,30 @@ const informationalActivities = computed(() => event.value?.activities?.filter((
 
 const formatTimeRange = (start?: string | null, end?: string | null) => {
   if (!start) return '';
-  
   const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
   const startTime = new Date(start).toLocaleTimeString('ru-RU', options);
-  
   if (!end) {
-    return `Начало в ${startTime}`;
+    return `в ${startTime}`; // Изменено для более короткой версии
   }
-  
   const endTime = new Date(end).toLocaleTimeString('ru-RU', options);
   return `${startTime} - ${endTime}`;
+}
+
+const formatTime = (dateStr?: string | null, timeStr?: string | null) => {
+  if (!dateStr || !timeStr) return '';
+  
+  // Преобразуем ДД.ММ.ГГГГ в ГГГГ-ММ-ДД для совместимости
+  const parts = dateStr.split('.');
+  if (parts.length !== 3) return ''; // Некорректный формат даты
+  const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  
+  // Создаем объект Date
+  const dateObj = new Date(`${isoDate}T${timeStr}`);
+  if (isNaN(dateObj.getTime())) return ''; // Проверка на невалидную дату
+
+  // Форматируем в HH:MM
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+  return dateObj.toLocaleTimeString('ru-RU', options);
 }
 
 async function loadEventData(id: string) {
@@ -258,7 +272,20 @@ const openViewer = (index: number) => {
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
     <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
-      <div class="max-w-md mx-auto"><div class="flex justify-between items-center mb-4 text-center"><div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div><div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ event.start_time }}</p></div><div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || 'Неограничено' }}</p></div><div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || 'Неограничено' }}</p></div></div><button @click="handleParticipate" class="w-full bg-primary text-white font-bold py-3 rounded-lg text-lg hover:opacity-90 transition-opacity">{{ authStore.isAuthenticated ? 'Участвовать' : 'Войти, чтобы участвовать' }}</button></div>
+      <div class="max-w-md mx-auto">
+        <div class="flex justify-between items-center mb-4 text-center">
+          <div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div>
+          
+          <div v-if="event.start_time">
+            <p class="text-sm text-gray-500">Начало</p>
+            <p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }}</p>
+          </div>
+          
+          <div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || '∞' }}</p></div>
+          <div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || '∞' }}</p></div>
+        </div>
+        <button @click="handleParticipate" class="w-full bg-primary text-white font-bold py-3 rounded-lg text-lg hover:opacity-90 transition-opacity">{{ authStore.isAuthenticated ? 'Участвовать' : 'Войти, чтобы участвовать' }}</button>
+      </div>
     </footer>
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
     <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
