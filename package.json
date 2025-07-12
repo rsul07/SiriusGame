@@ -15,7 +15,8 @@
     "axios": "^1.6.2",
     "pinia": "^2.1.7",
     "vue": "^3.3.8",
-    "vue-router": "^4.2.5"
+    "vue-router": "^4.2.5",
+    "vue-yandex-maps": "^2.1.9"
   },
   "devDependencies": {
     "@types/node": "^24.0.7",
@@ -25,6 +26,7 @@
     "@vue/eslint-config-prettier": "^8.0.0",
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/tsconfig": "^0.7.0",
+    "@yandex/ymaps3-types": "^1.0.16966980",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.54.0",
     "eslint-plugin-vue": "^9.18.1",
