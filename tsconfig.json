@@ -15,13 +15,21 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "types": ["node", "@yandex/ymaps3-types"],
 
-    /* Path Aliases - эта часть важна для VS Code */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.node.json" }],
+  // Добавляем явное исключение, чтобы TypeScript не лез в эти папки
+  "exclude": [
+    "node_modules",
+    "dist",
+    "node_modules/@yandex/ymaps3-types/modules",
+    "node_modules/@yandex/ymaps3-types/packages"
+  ]
 }
