@@ -3,7 +3,7 @@
     "target": "ES2020",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable", "esnext"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -16,15 +16,20 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-    "typeRoots": ["./node_modules/@types", "./node_modules/@yandex/ymaps3-types"],
+    "types": ["node", "@yandex/ymaps3-types"],
 
-    /* Path Aliases - эта часть важна для VS Code */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "ymaps3": ["./node_modules/@yandex/ymaps3-types"]
+      "@/*": ["src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.node.json" }],
+  // Добавляем явное исключение, чтобы TypeScript не лез в эти папки
+  "exclude": [
+    "node_modules",
+    "dist",
+    "node_modules/@yandex/ymaps3-types/modules",
+    "node_modules/@yandex/ymaps3-types/packages"
+  ]
 }
