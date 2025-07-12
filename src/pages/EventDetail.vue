@@ -85,7 +85,7 @@ const mapSettings = computed(() => {
     settings.location.center = [geoActivities.value[0].longitude, geoActivities.value[0].latitude];
     settings.location.zoom = 15;
   } else {
-    // Дефолтное местоположение, если вдруг понадобится
+    // Дефолтное местоположение
     settings.location.center = [39.9594, 43.4075];
     settings.location.zoom = 13;
   }
@@ -212,7 +212,7 @@ const openMapViewer = () => {
       <!-- Блок с картой: показываем только для ТЕКУЩИХ событий с координатами -->
       <div v-if="showMap" class="w-full h-full">
 
-        <yandex-map :settings="mapSettings" width="100%" height="100%">
+        <yandex-map :settings="mapSettings" width="100%" height="100%" >
           <yandex-map-default-scheme-layer/>
           <yandex-map-default-features-layer/>
           <yandex-map-controls :settings="{ position: 'right' }" />
