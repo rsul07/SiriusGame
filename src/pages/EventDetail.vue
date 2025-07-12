@@ -7,13 +7,11 @@ import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import { copyToClipboard } from '@/utils/clipboard'
-
-// Yandex Maps: Импортируем нужные компоненты
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
   YandexMapDefaultFeaturesLayer,
-  YandexMapMarker, // Используем кастомный маркер вместо YandexMapDefaultMarker
+  YandexMapMarker,
   YandexMapControls,
 } from 'vue-yandex-maps';
 
@@ -28,14 +26,12 @@ const errorPage = ref<string | null>(null)
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
 const showShareMenu = ref(false)
 
-// Состояния для вьюверов
 const isImageViewerOpen = ref(false)
-const isMapViewerOpen = ref(false) // <-- Возвращаем состояние для полноэкранной карты
+const isMapViewerOpen = ref(false)
 const currentImageIndex = ref(0)
 const imageRotation = ref(0)
 const copyButtonText = ref('Копировать')
 
-// Состояния для модалки с командами
 const showTeamModal = ref(false)
 const teamModalStep = ref<'choice' | 'form' | 'list' | 'link'>('choice')
 const teamAction = ref<'join' | 'create'>('create')
@@ -80,7 +76,6 @@ const showMap = computed(() => {
   return event.value?.state === 'current' && geoActivities.value.length > 0;
 });
 
-// Настройки карты, которые теперь снова динамические
 const mapSettings = computed(() => {
   const settings: { location: any } = { location: {} };
 
@@ -194,7 +189,6 @@ async function copyShareLink() {
   }
 }
 
-// --- Методы для вьюверов (возвращаем их) ---
 const nextImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length }
 const prevImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length }
 const rotateImage = () => { imageRotation.value += 90 }
@@ -217,18 +211,20 @@ const openMapViewer = () => {
 
       <!-- Блок с картой: показываем только для ТЕКУЩИХ событий с координатами -->
       <div v-if="showMap" class="w-full h-full">
+
         <yandex-map :settings="mapSettings" width="100%" height="100%">
           <yandex-map-default-scheme-layer/>
           <yandex-map-default-features-layer/>
           <yandex-map-controls :settings="{ position: 'right' }" />
-          <!-- Используем кастомные маркеры с иконками из активностей -->
+
+          <!-- Кастомные маркеры с иконками из активностей -->
           <yandex-map-marker v-for="activity in geoActivities" :key="activity.id" :settings="{ coordinates: [activity.longitude, activity.latitude] }">
             <div class="marker-container">
               <span class="marker-icon">{{ activity.icon || '🏆' }}</span>
             </div>
           </yandex-map-marker>
         </yandex-map>
-        <!-- Кнопка расширения карты, которая теперь тоже зависит от showMap -->
+
         <button @click.stop="openMapViewer" class="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors">
           <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 7C3 7.55228 2.55228 8 2 8C1.44772 8 1 7.55228 1 7V3C1 1.89543 1.89543 1 3 1H7C7.55228 1 8 1.44772 8 2C8 2.55228 7.55228 3 7 3H4.41421L10.7071 9.29289C11.0976 9.68342 11.0976 10.3166 10.7071 10.7071C10.3166 11.0976 9.68342 11.0976 9.29289 10.7071L3 4.41422V7Z"/><path d="M21 17C21 16.4477 21.4477 16 22 16C22.5523 16 23 16.4477 23 17V21C23 22.1046 22.1046 23 21 23H17C16.4477 23 16 22.5523 16 22C16 21.4477 16.4477 21 17 21H19.5858L13.2929 14.7071C12.9024 14.3166 12.9024 13.6834 13.2929 13.2929C13.6834 12.9024 14.3166 12.9024 14.7071 13.2929L21 19.5858V17Z"/><path d="M21 7C21 7.55228 21.4477 8 22 8C22.5523 8 23 7.55228 23 7V3C23 1.89543 22.1046 1 21 1H17C16.4477 1 16 1.44772 16 2C16 2.55228 16.4477 3 17 3H19.5858L13.2929 9.29289C12.9024 9.68342 12.9024 10.3166 13.2929 10.7071C13.6834 11.0976 14.3166 11.0976 14.7071 10.7071L21 4.41421V7Z"/><path d="M3 17C3 16.4477 2.55228 16 2 16C1.44772 16 1 16.4477 1 17V21C1 22.1046 1.89543 23 3 23H7C7.55228 23 8 22.5523 8 22C8 21.4477 7.55228 21 7 21H4.41421L10.7071 14.7071C11.0976 14.3166 11.0976 13.6834 10.7071 13.2929C10.3166 12.9024 9.68342 12.9024 9.29289 13.2929L3 19.5858V17Z"/></svg>
         </button>
@@ -243,7 +239,7 @@ const openMapViewer = () => {
       </div>
 
       <!-- Общие элементы UI в шапке -->
-      <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
+      <div class="absolute inset-0 to-transparent pointer-events-none" :class="{ 'bg-gradient-to-t from-black/30': !showMap }"></div>
       <button @click.stop="router.back()" class="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
       <button @click.stop="showShareMenu = true" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684Zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684Z" /></svg></button>
     </div>
@@ -338,7 +334,7 @@ const openMapViewer = () => {
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
     <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
 
-    <!-- Полноэкранные вьюверы (возвращаем) -->
+    <!-- Полноэкранные вьюверы -->
     <Teleport to="body">
       <!-- Полноэкранная карта -->
       <Transition name="modal-fade">
@@ -381,18 +377,6 @@ const openMapViewer = () => {
 </template>
 
 <style scoped>
-.image-fade-enter-active,
-.image-fade-leave-active,
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.image-fade-enter-from,
-.image-fade-leave-to,
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
 
 /* Стили для кастомных маркеров */
 .marker-container {
