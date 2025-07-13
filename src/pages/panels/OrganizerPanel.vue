@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
-import { createEventApi, updateEventApi, addEventMediaApi, deleteEventMediaApi } from '@/api/events';
+import { createEventApi, updateEventApi, addEventMediaApi, deleteEventMediaApi, deleteEventApi } from '@/api/events';
 import EventCard from '@/components/EventCard.vue';
 
 const eventStore = useEventStore();
@@ -82,6 +82,19 @@ const backToSelection = () => {
   selectedEvent.value = null;
   form.data = null;
   isCreatingNew.value = false;
+};
+
+const deleteEvent = async (event: IEventCard) => {
+  const confirmed = confirm(`Вы уверены, что хотите удалить мероприятие "${event.title}"?\n\nЭто действие нельзя отменить.`);
+  if (!confirmed) return;
+  
+  try {
+    await deleteEventApi(event.id);
+    alert('Мероприятие успешно удалено!');
+    await eventStore.fetchEvents(true);
+  } catch (error: any) {
+    alert(`Ошибка при удалении: ${error.message}`);
+  }
 };
 
 // const addActivity = () => {
@@ -197,7 +210,10 @@ onMounted(() => {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div v-for="event in events" :key="event.id" class="flex flex-col">
               <EventCard :event="event" class="flex-grow"/>
-              <button @click="selectEventForEditing(event)" class="w-full mt-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Редактировать</button>
+              <div class="flex gap-2 mt-2">
+                <button @click="selectEventForEditing(event)" class="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Редактировать</button>
+                <button @click="deleteEvent(event)" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Удалить</button>
+              </div>
             </div>
             <div v-if="events.length === 0" class="col-span-3">
               <p class="text-gray-600 text-center">Нет таких мероприятий</p>
@@ -224,9 +240,6 @@ onMounted(() => {
             <div>
               <label class="block text-sm font-medium text-gray-700">Дата проведения</label>
               <input v-model="form.data.date" type="text" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-            <div>
-              <!-- ...existing code... -->
             </div>
           </div>
           <div class="grid md:grid-cols-2 gap-6">
