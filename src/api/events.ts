@@ -89,3 +89,13 @@ export async function deleteEventMediaApi(eventId: number, mediaId: number): Pro
     throw new Error('Не удалось удалить медиа');
   }
 }
+
+// Удаляет мероприятие
+export async function deleteEventApi(eventId: number): Promise<boolean> {
+  try {
+    const response = await api.delete(`/events/${eventId}`);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось удалить мероприятие');
+  }
+}
