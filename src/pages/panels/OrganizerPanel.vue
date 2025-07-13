@@ -48,11 +48,11 @@ const createNewEvent = () => {
     title: 'Новое мероприятие',
     description: 'Описание мероприятия (сюда можно добавить правила, дополнительные условия, и т.д.)',
     date: new Date().toISOString().split('T')[0],
+    start_time: '00:00',
+    end_time: '23:59',
     is_team: false,
     max_members: 1,
     max_teams: 1,
-    media: [],
-    activities: [],
   };
   isCreatingNew.value = true;
   selectedEvent.value = form.data as IEventDetail;
@@ -146,14 +146,28 @@ onMounted(() => {
               <!-- ...existing code... -->
             </div>
           </div>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Время начала (ЧЧ:ММ)</label>
+              <input v-model="form.data.start_time" type="time" class="mt-1 w-full p-2 border rounded-md" placeholder="09:00">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Время окончания (ЧЧ:ММ)</label>
+              <input v-model="form.data.end_time" type="time" class="mt-1 w-full p-2 border rounded-md" placeholder="18:00">
+            </div>
+          </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Описание</label>
             <textarea v-model="form.data.description" rows="4" class="mt-1 w-full p-2 border rounded-md"></textarea>
           </div>
           <div class="grid md:grid-cols-2 gap-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700">URL медиа (каждый с новой строки)</label>
-              <textarea :value="form.data?.media?.map(m => m.url).join('\n') || ''" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
+              <label class="block text-sm font-medium text-gray-700">URL изображений (каждый с новой строки)</label>
+              <textarea :value="form.data?.media?.filter(m => m.media_type === 'image').map(m => m.url).join('\n') || ''" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">URL документов (каждый с новой строки)</label>
+              <textarea :value="form.data?.media?.filter(m => m.media_type === 'document').map(m => m.url).join('\n') || ''" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
             </div>
           </div>
           <div class="grid md:grid-cols-2 gap-6">
