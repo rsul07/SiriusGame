@@ -35,18 +35,18 @@ export interface IEventCard {
   is_team: boolean;
   date: string;
   state: 'future' | 'current' | 'past';
-  preview_url: string | null;
+  preview_url: string | null; // <-- ИЗМЕНЕНИЕ: Добавляем поле из API
   leaderboard?: Leader[];
 }
 
 // "Тяжелый" интерфейс для детальной страницы
 export interface IEventDetail extends IEventCard {
   description: string;
-  media: Media[];
+  media: Media[]; // <-- Здесь остается полный массив медиа
   start_time?: string;
   end_time?: string;
   max_members?: number;
-  max_teams?: number | null;
+  max_teams?: number;
   leaderboard?: Leader[];
   activities?: Activity[];
 }
