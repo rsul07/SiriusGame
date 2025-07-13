@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { IEventCard, IEventDetail } from '@/types'
+import type { IEventCard, IEventDetail, Media } from '@/types' 
 
 const API_URL = 'https://siriusgames.ru/api'
 
@@ -39,12 +39,12 @@ export async function fetchEventsApi(): Promise<IEventCard[]> {
 
 // Возвращает одно "тяжелое" событие
 export async function fetchEventByIdApi(id: number): Promise<IEventDetail> {
-    try {
-      const response = await api.get(`/events/${id}`);
-      return mapEventData(response.data);
-    } catch (error) {
-      throw new Error('Не удалось загрузить данные мероприятия');
-    }
+  try {
+    const response = await api.get(`/events/${id}`);
+    return mapEventData(response.data);
+  } catch (error) {
+    throw new Error('Не удалось загрузить данные мероприятия');
+  }
 }
 
 // Создает новое мероприятие
@@ -67,5 +67,25 @@ export async function updateEventApi(id: number, eventData: Partial<IEventDetail
     return response.data.ok;
   } catch (error) {
     throw new Error('Не удалось обновить мероприятие: ' + error);
+  }
+}
+
+// Добавляет медиа к мероприятию
+export async function addEventMediaApi(eventId: number, mediaData: Partial<Media>): Promise<boolean> {
+  try {
+    const response = await api.post(`/events/${eventId}/media`, mediaData);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось добавить медиа');
+  }
+}
+
+// Удаляет медиа из мероприятия
+export async function deleteEventMediaApi(eventId: number, mediaId: number): Promise<boolean> {
+  try {
+    const response = await api.delete(`/events/${eventId}/media/${mediaId}`);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось удалить медиа');
   }
 }

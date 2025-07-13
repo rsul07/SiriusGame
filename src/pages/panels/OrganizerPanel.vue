@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
-import { createEventApi, updateEventApi } from '@/api/events';
+import { createEventApi, updateEventApi, addEventMediaApi, deleteEventMediaApi } from '@/api/events';
 import EventCard from '@/components/EventCard.vue';
 
 const eventStore = useEventStore();
@@ -106,21 +106,71 @@ const backToSelection = () => {
 
 const saveEvent = async () => {
   if (!validateEventForm()) return;
-  if (form.data!.date) {
-    // Преобразуем дату в формат YYYY-MM-DD
-    form.data!.date = form.data!.date.replace(/(\d{2})\.(\d{2})\.(\d{4})/, '$3-$2-$1'); 
+  
+  // Подготавливаем данные для отправки (без медиа)
+  const { media, leaderboard, activities, id, state, preview_url, ...eventData } = form.data!;
+
+  if (eventData.date) {
+    eventData.date = eventData.date.replace(/(\d{2})\.(\d{2})\.(\d{4})/, '$3-$2-$1'); 
   }
+  
+  if (eventData.max_teams == undefined) {
+    delete eventData.max_teams; 
+  }
+
+  console.log(eventData)
+  
   try {
+    let eventId: number;
+    
     if (isCreatingNew.value) {
-      await createEventApi(form.data!);
+      eventId = await createEventApi(eventData);
       alert('Мероприятие создано успешно!');
     } else {
-      await updateEventApi(selectedEvent.value!.id, form.data!);
+      await updateEventApi(selectedEvent.value!.id, eventData);
+      eventId = selectedEvent.value!.id;
+      
+      // Удаляем все существующие медиа
+      const existingMedia = selectedEvent.value!.media || [];
+      for (const media of existingMedia) {
+        try {
+          await deleteEventMediaApi(eventId, media.id);
+          console.log('Медиа удалено:', media.id);
+        } catch (error) {
+          console.warn('Не удалось удалить медиа:', media.id);
+        }
+      }
+      
       alert('Мероприятие сохранено успешно!');
+    }
+    
+    // Добавляем новые медиа
+    const mediaTypes: Array<'image' | 'document'> = ['image', 'document'];
+    for (const mediaType of mediaTypes) {
+      const urls = (document.querySelector(`textarea[data-media-type="${mediaType}"]`) as HTMLTextAreaElement)?.value
+        .split('\n')
+        .filter(url => url.trim());
+
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          const url = urls[i].trim();
+          const fileName = url.split('/').pop() || `${mediaType}_${i + 1}`;
+          await addEventMediaApi(eventId, {
+            url: url,
+            media_type: mediaType,
+            name: fileName,
+            order: i
+          });
+          console.log(`Добавлено ${mediaType}:`, url);
+        } catch (error) {
+          console.warn(`Не удалось добавить ${mediaType}:`, urls[i]);
+        }
+      }
     }
     
     // Обновляем store
     await eventStore.fetchEvents(true);
+    await eventStore.fetchEventById(eventId, true);
     backToSelection();
   } catch (error: any) {
     alert(`${error.message}`);
@@ -196,11 +246,23 @@ onMounted(() => {
           <div class="grid md:grid-cols-2 gap-6">
             <div>
               <label class="block text-sm font-medium text-gray-700">URL изображений (каждый с новой строки)</label>
-              <textarea :value="form.data?.media?.filter(m => m.media_type === 'image').map(m => m.url).join('\n') || ''" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
+              <textarea 
+                :value="form.data?.media?.filter(m => m.media_type === 'image').map(m => m.url).join('\n') || ''" 
+                data-media-type="image"
+                rows="3" 
+                class="mt-1 w-full p-2 border rounded-md"
+                placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.png">
+              </textarea>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">URL документов (каждый с новой строки)</label>
-              <textarea :value="form.data?.media?.filter(m => m.media_type === 'document').map(m => m.url).join('\n') || ''" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
+              <textarea 
+                :value="form.data?.media?.filter(m => m.media_type === 'document').map(m => m.url).join('\n') || ''" 
+                data-media-type="document"
+                rows="3" 
+                class="mt-1 w-full p-2 border rounded-md"
+                placeholder="https://example.com/doc1.pdf&#10;https://example.com/doc2.docx">
+              </textarea>
             </div>
           </div>
           <div class="grid md:grid-cols-2 gap-6">
