@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
+import { createEventApi, updateEventApi } from '@/api/events';
 import EventCard from '@/components/EventCard.vue';
 
 const eventStore = useEventStore();
@@ -25,6 +26,26 @@ function validateEventForm() {
     alert('Для командного мероприятия укажите максимальное число команд!');
     return false;
   }
+  if (!form.data.title || form.data.title.trim() === '') {
+    alert('Название мероприятия не может быть пустым!');
+    return false;
+  }
+  if (!form.data.date || !/^\d{2}\.\d{2}\.\d{4}$/.test(form.data.date)) {
+    alert('Укажите корректную дату в формате ДД.ММ.ГГГГ!');
+    return false;
+  }
+  if (!form.data.start_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.start_time)) {
+    alert('Укажите корректное время начала в формате ЧЧ:ММ!');
+    return false;
+  }
+  if (!form.data.end_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.end_time)) {
+    alert('Укажите корректное время окончания в формате ЧЧ:ММ!');
+    return false;
+  }
+  if (form.data.start_time >= form.data.end_time) {
+    alert('Время начала должно быть раньше времени окончания!');
+    return false;
+  }
   return true;
 }
 const isCreatingNew = ref(false);
@@ -47,12 +68,11 @@ const createNewEvent = () => {
   form.data = {
     title: 'Новое мероприятие',
     description: 'Описание мероприятия (сюда можно добавить правила, дополнительные условия, и т.д.)',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('ru-RU'),
     start_time: '00:00',
     end_time: '23:59',
     is_team: false,
     max_members: 1,
-    max_teams: 1,
   };
   isCreatingNew.value = true;
   selectedEvent.value = form.data as IEventDetail;
@@ -84,14 +104,27 @@ const backToSelection = () => {
 //   form.data?.leaderboard?.splice(index, 1);
 // };
 
-const saveEvent = () => {
+const saveEvent = async () => {
   if (!validateEventForm()) return;
-  if (isCreatingNew.value) {
-    alert('Мероприятие создано (симуляция)');
-  } else {
-    alert('Мероприятие сохранено (симуляция)');
+  if (form.data!.date) {
+    // Преобразуем дату в формат YYYY-MM-DD
+    form.data!.date = form.data!.date.replace(/(\d{2})\.(\d{2})\.(\d{4})/, '$3-$2-$1'); 
   }
-  backToSelection();
+  try {
+    if (isCreatingNew.value) {
+      await createEventApi(form.data!);
+      alert('Мероприятие создано успешно!');
+    } else {
+      await updateEventApi(selectedEvent.value!.id, form.data!);
+      alert('Мероприятие сохранено успешно!');
+    }
+    
+    // Обновляем store
+    await eventStore.fetchEvents(true);
+    backToSelection();
+  } catch (error: any) {
+    alert(`${error.message}`);
+  }
 }
 
 onMounted(() => {
@@ -148,11 +181,11 @@ onMounted(() => {
           </div>
           <div class="grid md:grid-cols-2 gap-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Время начала (ЧЧ:ММ)</label>
+              <label class="block text-sm font-medium text-gray-700">Время начала</label>
               <input v-model="form.data.start_time" type="time" class="mt-1 w-full p-2 border rounded-md" placeholder="09:00">
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Время окончания (ЧЧ:ММ)</label>
+              <label class="block text-sm font-medium text-gray-700">Время окончания</label>
               <input v-model="form.data.end_time" type="time" class="mt-1 w-full p-2 border rounded-md" placeholder="18:00">
             </div>
           </div>

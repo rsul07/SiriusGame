@@ -3,6 +3,14 @@ import type { IEventCard, IEventDetail } from '@/types'
 
 const API_URL = 'https://siriusgames.ru/api'
 
+// Создаем axios instance
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
 // Общая функция маппинга
 function mapEventData(eventData: any) {
   return {
@@ -22,7 +30,7 @@ function mapEventData(eventData: any) {
 // Возвращает массив "легких" карточек
 export async function fetchEventsApi(): Promise<IEventCard[]> {
   try {
-    const response = await axios.get(`${API_URL}/events`)
+    const response = await api.get('/events')
     return response.data.map(mapEventData) // Просто маппим, TypeScript сам возьмет нужные поля
   } catch (error) {
     throw new Error('Не удалось загрузить список мероприятий');
@@ -32,9 +40,32 @@ export async function fetchEventsApi(): Promise<IEventCard[]> {
 // Возвращает одно "тяжелое" событие
 export async function fetchEventByIdApi(id: number): Promise<IEventDetail> {
     try {
-      const response = await axios.get(`${API_URL}/events/${id}`);
+      const response = await api.get(`/events/${id}`);
       return mapEventData(response.data);
     } catch (error) {
       throw new Error('Не удалось загрузить данные мероприятия');
     }
+}
+
+// Создает новое мероприятие
+export async function createEventApi(eventData: Partial<IEventDetail>): Promise<number> {
+  try {
+    const response = await api.post('/events', eventData);
+    if (response.data.ok) {
+      return response.data.event_id;
+    }
+    throw new Error('Ошибка создания мероприятия');
+  } catch (error) {
+    throw new Error('Не удалось создать мероприятие');
+  }
+}
+
+// Обновляет существующее мероприятие
+export async function updateEventApi(id: number, eventData: Partial<IEventDetail>): Promise<boolean> {
+  try {
+    const response = await api.patch(`/events/${id}`, eventData);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось обновить мероприятие: ' + error);
+  }
 }
