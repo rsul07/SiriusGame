@@ -28,17 +28,16 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-bgMain">
-    <!-- Main теперь просто контейнер для позиционирования -->
-    <main class="flex-1 relative overflow-hidden">
+  <!-- 
+    Добавляем CSS переменные для безопасных зон.
+    padding-top: env(safe-area-inset-top) -> отступ сверху, чтобы контент не заезжал под статус-бар/челку.
+    padding-bottom: env(safe-area-inset-bottom) -> отступ снизу, чтобы контент не заезжал под системную панель навигации.
+  -->
+  <div class="h-screen bg-bgMain" style="padding-top: env(safe-area-inset-top);">
+    <main class="flex-1 overflow-y-auto pb-16 h-full">
       <RouterView v-slot="{ Component, route }">
         <Transition :name="transitionName" mode="out-in">
-          <!-- 
-            КЛЮЧЕВОЕ ИЗМЕНЕНИЕ:
-            Скролл и padding теперь здесь, ВНУТРИ анимированного блока.
-            pb-16 (padding-bottom: 4rem) компенсирует высоту BottomNavbar.
-          -->
-          <div :key="route.name" class="absolute w-full h-full overflow-y-auto pb-16">
+          <div :key="route.name" class="absolute w-full h-full">
             <component :is="Component" />
           </div>
         </Transition>
