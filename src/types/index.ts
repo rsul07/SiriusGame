@@ -14,6 +14,8 @@ export interface User {
   birthday?: string;
   gender?: 'male' | 'female';
   is2FAEnabled?: boolean;
+  teamId?: number | null; // <-- ДОБАВЛЕНО
+  isCaptain?: boolean;    // <-- ДОБАВЛЕНО
 }
 
 export interface Activity {

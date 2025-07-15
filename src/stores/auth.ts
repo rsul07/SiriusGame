@@ -18,6 +18,8 @@ function mapUser(backendUser: any): User {
     weight: backendUser.weight_kg,
     is2FAEnabled: backendUser.is_2fa_enabled,
     role: backendUser.role,
+    teamId: backendUser.team_id,
+    isCaptain: backendUser.is_captain,
   };
 }
 
@@ -32,13 +34,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   const userAvatar = computed(() => {
     if (user.value?.avatarUrl) {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      if (user.value.avatarUrl.startsWith('http')) {
+        return user.value.avatarUrl;
+      }
       return `${apiUrl}${user.value.avatarUrl}`;
     }
     return '/img/icons/default-avatar.svg';
   });
 
-  const registeredEventIds = ref<number[]>([1, 3]);
+  const registeredEventIds = ref<number[]>([3]);
 
   function setToken(newToken: string | null) {
     token.value = newToken;
@@ -69,7 +74,14 @@ export const useAuthStore = defineStore('auth', () => {
     });
     setToken(tokenData.access_token);
     const backendUser = await getMeApi();
-    setUser(mapUser(backendUser));
+    const mappedUser = mapUser(backendUser);
+    
+    if (mappedUser.role === 'judge') {
+        mappedUser.teamId = 12345;
+        mappedUser.isCaptain = true;
+    }
+    
+    setUser(mappedUser);
     await router.push(redirectPath.value || '/app/profile');
     redirectPath.value = null;
   }
@@ -124,13 +136,44 @@ export const useAuthStore = defineStore('auth', () => {
   async function joinOrCreateTeam(action: 'join' | 'create', teamInfo: { name: string }): Promise<{ inviteLink: string }> {
     console.log(`Performing action: ${action} for team: ${teamInfo.name}`);
     await new Promise(resolve => setTimeout(resolve, 500));
-    const inviteLink = `https://sirius.game/join?team=${Date.now()}&token=${Math.random().toString(36).substring(2, 10)}`;
+
+    if (user.value && action === 'create') {
+        const newTeamId = Date.now();
+        const updatedUser: User = { ...user.value, teamId: newTeamId, isCaptain: true };
+        setUser(updatedUser);
+    }
+    
+    const inviteLink = `https://sirius.game/join?team=${user.value?.teamId}&token=${Math.random().toString(36).substring(2, 10)}`;
     return { inviteLink };
+  }
+
+  function leaveTeam() {
+    if (user.value) {
+      const updatedUser: User = { ...user.value, teamId: undefined, isCaptain: false };
+      setUser(updatedUser);
+      alert('Вы вышли из команды (симуляция).');
+    }
+  }
+
+  function toggleEventRegistration(eventId: number) {
+    if (!user.value) return;
+
+    const index = registeredEventIds.value.indexOf(eventId);
+    if (index > -1) {
+      registeredEventIds.value.splice(index, 1);
+      alert('Регистрация отменена!');
+    } else {
+      registeredEventIds.value.push(eventId);
+      alert('Вы успешно зарегистрировались на мероприятие!');
+    }
   }
 
   return {
     token, user, isAuthenticated, userAvatar, registeredEventIds,
     login, register, logout, setRedirectPath, checkAuth,
-    updateProfile, changePassword, uploadAvatar,joinOrCreateTeam,
+    updateProfile, changePassword, uploadAvatar,
+    joinOrCreateTeam,
+    leaveTeam,
+    toggleEventRegistration
   }
 })
