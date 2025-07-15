@@ -11,6 +11,10 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^7.0.1",
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/status-bar": "^7.0.1",
     "@vueuse/core": "^13.5.0",
     "axios": "^1.6.2",
     "pinia": "^2.1.7",
@@ -19,6 +23,7 @@
     "vue-yandex-maps": "^2.1.9"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.2",
     "@types/node": "^24.0.7",
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",

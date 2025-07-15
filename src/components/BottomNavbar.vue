@@ -51,7 +51,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <nav class="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-gray-200">
+  <!-- 
+    Добавляем padding-bottom, который будет равен высоте системной навигационной панели.
+    На iOS без панели он будет 0, на Android с жестами - несколько пикселей.
+  -->
+  <nav class="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-gray-200" style="padding-bottom: env(safe-area-inset-bottom);">
     <div class="relative grid h-full max-w-lg grid-cols-3 mx-auto">
 
       <!-- Плавающий элемент выделения (линия сверху) -->
