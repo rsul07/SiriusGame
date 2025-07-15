@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, computed } from 'vue';
+import {reactive, ref, onMounted, computed, watch} from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useEventStore } from '@/stores/events';
 import { RouterLink } from 'vue-router';
@@ -18,19 +18,33 @@ const copyIdText = ref('Копировать ID')
 const loginForm = reactive({ loginIdentifier: '', password: '' });
 const loginIsLoading = ref(false);
 const loginError = ref<string|null>(null);
-const twoFaForm = reactive({ code: '' });
 
 const profileForm = reactive({
-  fullName: authStore.user?.fullName || '',
-  height: authStore.user?.height || '',
-  weight: authStore.user?.weight || '',
-  birthday: authStore.user?.birthday || '',
-  gender: authStore.user?.gender || '',
+  fullName: '',
+  height: '',
+  weight: '',
+  birthday: '',
+  gender: '' as '' | 'male' | 'female',
 });
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
 
+watch(() => authStore.user, (newUser: any) => {
+  if (newUser) {
+    profileForm.fullName = newUser.fullName || '';
+    profileForm.height = newUser.height?.toString() || '';
+    profileForm.weight = newUser.weight?.toString() || '';
+    profileForm.birthday = newUser.birthday || '';
+    profileForm.gender = newUser.gender || '';
+  }
+}, { immediate: true });
+
 const avatarFile = ref<File | null>(null);
-const avatarPreview = ref<string | null>(authStore.user?.avatarUrl || null);
+const avatarPreview = computed(() => {
+  if (avatarFile.value) {
+    return URL.createObjectURL(avatarFile.value);
+  }
+  return authStore.userAvatar;
+});
 const avatarInput = ref<HTMLInputElement | null>(null);
 
 const registeredEvents = computed(() => eventStore.events.filter(event => authStore.registeredEventIds.includes(event.id)));
@@ -46,9 +60,9 @@ const panelLink = computed(() => {
 });
 
 const copyUserId = async () => {
-  if (!authStore.user?.id) return;
-  const success = await copyToClipboard(authStore.user.id);
-  if (success) { copyIdText.value = 'Скопировано!'; } 
+  if (!authStore.user?.handle) return;
+  const success = await copyToClipboard(authStore.user.handle);
+  if (success) { copyIdText.value = 'Скопировано!'; }
   else { copyIdText.value = 'Ошибка'; }
   setTimeout(() => { copyIdText.value = 'Копировать ID'; }, 2000);
 };
@@ -57,28 +71,13 @@ const handleLogin = async () => {
   loginIsLoading.value = true;
   loginError.value = null;
   try {
-    const result = await authStore.login(loginForm);
-    if (result.requires2FA) {
-      loginStep.value = '2fa';
-    }
+    await authStore.login(loginForm);
   } catch (e) {
     loginError.value = 'Неверный логин или пароль';
   } finally {
     loginIsLoading.value = false;
   }
 };
-
-const handle2FA = async () => {
-  loginIsLoading.value = true;
-  loginError.value = null;
-  try {
-    await authStore.verify2FA(twoFaForm.code);
-  } catch (e) {
-    loginError.value = 'Неверный код подтверждения';
-  } finally {
-    loginIsLoading.value = false;
-  }
-}
 
 const handleLogout = () => {
   showLogoutConfirm.value = false;
@@ -87,19 +86,52 @@ const handleLogout = () => {
 
 const triggerAvatarUpload = () => { avatarInput.value?.click(); };
 
-const onFileSelected = (event: Event) => {
+const onFileSelected = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
     avatarFile.value = target.files[0];
-    const reader = new FileReader();
-    reader.onload = (e) => { avatarPreview.value = e.target?.result as string; };
-    reader.readAsDataURL(avatarFile.value);
-    console.log("Uploading avatar:", avatarFile.value.name);
+    try {
+      await authStore.uploadAvatar(avatarFile.value);
+      avatarFile.value = null;
+      alert('Аватар успешно обновлен!');
+    } catch (error) {
+      alert('Ошибка загрузки аватара.');
+    }
   }
 };
 
-const handleProfileSave = () => { alert('Профиль сохранен (симуляция)'); showSettings.value = false; };
-const handlePasswordChange = () => { alert('Пароль изменен (симуляция)'); showSettings.value = false; };
+const handleProfileSave = async () => {
+  try {
+    await authStore.updateProfile({
+      fullName: profileForm.fullName,
+      height: profileForm.height ? parseInt(profileForm.height) : undefined,
+      weight: profileForm.weight ? parseFloat(profileForm.weight) : undefined,
+      birthday: profileForm.birthday,
+      gender: profileForm.gender || undefined,
+    });
+    alert('Профиль сохранен!');
+    showSettings.value = false;
+  } catch (error) {
+    alert('Ошибка сохранения профиля.');
+  }
+};
+
+const handlePasswordChange = async () => {
+  if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+    alert('Новые пароли не совпадают!');
+    return;
+  }
+  try {
+    await authStore.changePassword(passwordForm);
+    alert('Пароль успешно изменен!');
+    passwordForm.oldPassword = '';
+    passwordForm.newPassword = '';
+    passwordForm.confirmNewPassword = '';
+    showSettings.value = false;
+  } catch (error) {
+    alert('Ошибка смены пароля. Проверьте старый пароль.');
+  }
+};
 
 onMounted(() => { eventStore.fetchEvents(); });
 </script>
@@ -114,7 +146,7 @@ onMounted(() => { eventStore.fetchEvents(); });
           <div>
             <h1 class="text-3xl font-bold">{{ authStore.user.fullName }}</h1>
             <div class="flex items-center gap-2 mt-1 group cursor-pointer" @click="copyUserId">
-              <p class="text-sm text-gray-500">ID: {{ authStore.user.id }}</p>
+              <p class="text-sm text-gray-500">ID: {{ authStore.user.handle }}</p>
               <div class="relative">
                 <svg class="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                 <span class="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-white bg-gray-700 px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{{ copyIdText }}</span>
@@ -158,7 +190,6 @@ onMounted(() => { eventStore.fetchEvents(); });
           <p v-if="loginError" class="text-sm text-red-600 pt-2">{{ loginError }}</p>
           <button type="submit" :disabled="loginIsLoading" class="w-full py-2 px-4 text-white bg-primary rounded-md disabled:bg-gray-400">Войти</button>
         </form>
-        <form v-if="loginStep === '2fa'" @submit.prevent="handle2FA" class="space-y-4"><h2 class="text-xl font-bold text-center mb-2">Подтверждение входа</h2><p class="text-center text-sm text-gray-600 mb-4">Мы отправили код на вашу почту.</p><div><label for="2fa-code" class="block text-sm font-medium text-gray-700">Код подтверждения</label><input v-model="twoFaForm.code" type="text" id="2fa-code" required class="mt-1 w-full text-center tracking-[0.5em] text-lg px-3 py-2 border border-gray-300 rounded-md"></div><p v-if="loginError" class="text-sm text-red-600 pt-2">{{ loginError }}</p><button type="submit" :disabled="loginIsLoading" class="w-full py-2 px-4 text-white bg-primary rounded-md disabled:bg-gray-400">Подтвердить</button></form>
         <div class="mt-6 text-center"><p class="text-sm text-gray-600">Нет аккаунта? <RouterLink :to="{ name: 'Register' }" class="font-medium text-primary hover:underline">Зарегистрируйтесь</RouterLink></p></div>
       </div>
     </div>

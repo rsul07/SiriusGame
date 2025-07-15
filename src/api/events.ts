@@ -1,24 +1,14 @@
-import axios from 'axios'
-import type { IEventCard, IEventDetail, Media } from '@/types' 
-
-const API_URL = 'https://siriusgames.ru/api'
-
-// Создаем axios instance
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+import api from './index';
+import type { IEventCard, IEventDetail, Media } from '@/types'
 
 // Общая функция маппинга
 function mapEventData(eventData: any) {
   return {
     ...eventData,
-    date: eventData.date ? new Date(eventData.date).toLocaleDateString('ru-RU', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit' 
+    date: eventData.date ? new Date(eventData.date).toLocaleDateString('ru-RU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     }) : 'Дата не указана',
     description: eventData.description || 'Описание отсутствует.',
     media: eventData.media || [],
@@ -31,7 +21,7 @@ function mapEventData(eventData: any) {
 export async function fetchEventsApi(): Promise<IEventCard[]> {
   try {
     const response = await api.get('/events')
-    return response.data.map(mapEventData) // Просто маппим, TypeScript сам возьмет нужные поля
+    return response.data.map(mapEventData)
   } catch (error) {
     throw new Error('Не удалось загрузить список мероприятий');
   }

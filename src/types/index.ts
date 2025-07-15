@@ -3,9 +3,10 @@ export interface Leader { id: number; name: string; score: number; avatarUrl: st
 
 export interface User {
   id: string;
+  handle: string;
   fullName: string;
   email: string;
-  phone?: string; 
+  phone?: string;
   role: 'admin' | 'organizer' | 'judge' | 'user';
   avatarUrl?: string;
   height?: number;
@@ -49,4 +50,13 @@ export interface IEventDetail extends IEventCard {
   max_teams?: number | null;
   leaderboard?: Leader[];
   activities?: Activity[];
+}
+
+export interface RegisterFormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  birthday: string;
+  gender: 'male' | 'female';
 }
