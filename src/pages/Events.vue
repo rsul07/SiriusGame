@@ -44,19 +44,19 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="p-4 max-w-7xl mx-auto">
+    <div class="p-4 max-w-4xl mx-auto">
       <div v-if="isLoading && events.length === 0" class="text-center text-gray-500 pt-10">Загрузка...</div>
       <div v-else-if="error" class="text-center text-red-500 pt-10">{{ error }}</div>
       <div v-else>
         <Transition name="fade" mode="out-in">
           <div v-if="activeTab === 'future'">
-            <div v-if="futureEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div v-if="futureEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <EventCard v-for="event in futureEvents" :key="event.id" :event="event"/>
             </div>
             <EmptyState v-else title="Нет будущих мероприятий" message="Мы скоро добавим новые анонсы, заглядывайте позже!"/>
           </div>
           <div v-else-if="activeTab === 'past'">
-            <div v-if="pastEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div v-if="pastEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <EventCard v-for="event in pastEvents" :key="event.id" :event="event"/>
             </div>
             <EmptyState v-else title="Нет прошедших мероприятий" message="История ваших побед начнется здесь."/>

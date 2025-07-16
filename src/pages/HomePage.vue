@@ -44,7 +44,7 @@ onMounted(() => {
     </div>
 
     <!-- Общая обертка для центрирования всего контента на больших экранах -->
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-4xl mx-auto">
       <div class="pt-16">
         <div class="flex flex-col items-center justify-center my-8">
           <img src="@/assets/sirius.png" alt="App Logo" class="w-24 h-24 mb-4">
