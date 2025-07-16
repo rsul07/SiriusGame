@@ -358,8 +358,9 @@ const openMapViewer = () => {
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
+
     <TeamManagementModal
-        v-if="showTeamManagementModal"
+        v-if="event && showTeamManagementModal"
         :event-id="event.id"
         :current-participation="currentUserParticipation"
         :is-captain="isCaptain"
