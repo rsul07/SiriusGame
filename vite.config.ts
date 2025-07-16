@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import svgLoader from 'vite-svg-loader'
 import { URL, fileURLToPath } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   // Плагин для Vue 3 уже есть. Никаких vite-plugin-vue2 не нужно.
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    svgLoader()
+  ],
 
   resolve: {
     alias: {

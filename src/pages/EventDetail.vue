@@ -222,7 +222,7 @@ const openMapViewer = () => {
   <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка...</div>
   <div v-else-if="errorPage" class="flex items-center justify-center h-full text-red-500 p-4 text-center">{{ errorPage }}</div>
   <div v-else-if="event" class="bg-bgMain min-h-full">
-    <div class="relative w-full h-64 bg-gray-300">
+    <div class="relative w-full h-80 bg-gray-300">
 
       <!-- Блок с картой: показываем только для ТЕКУЩИХ событий с координатами -->
       <div v-if="showMap" class="w-full h-full">
@@ -260,7 +260,7 @@ const openMapViewer = () => {
     </div>
 
     <!-- Контент страницы -->
-    <div class="p-4">
+    <div class="p-4 max-w-4xl mx-auto">
       <h1 class="text-3xl font-bold mb-4">{{ event.title }}</h1>
       <div class="flex border-b mb-4">
         <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
