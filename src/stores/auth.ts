@@ -34,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const userAvatar = computed(() => {
     if (user.value?.avatarUrl) {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       if (user.value.avatarUrl.startsWith('http')) {
         return user.value.avatarUrl;
       }
