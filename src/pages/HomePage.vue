@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import EventCardCurrent from '@/components/EventCardCurrent.vue'
 import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { onClickOutside } from '@vueuse/core'
+import EmptyState from '@/components/EmptyState.vue'
 
 const eventStore = useEventStore()
 const notificationStore = useNotificationStore()
@@ -57,8 +58,7 @@ onMounted(() => {
           <div v-if="currentEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <EventCardCurrent v-for="event in currentEvents" :key="event.id" :event="event" />
           </div>
-          <EmptyState 
-            v-else
+          <EmptyState v-else
             title="Нет активных мероприятий"
             message="В данный момент нет идущих соревнований. Загляните на вкладку 'Мероприятия', чтобы увидеть будущие!"
           />
