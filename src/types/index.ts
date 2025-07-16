@@ -18,6 +18,13 @@ export interface User {
   isCaptain?: boolean;
 }
 
+export interface UserPublic {
+  id: string;
+  handle: string;
+  full_name: string;
+  avatar_url?: string;
+}
+
 export interface Activity {
   id: number;
   name: string;
@@ -64,7 +71,7 @@ export interface RegisterFormData {
 }
 
 export interface ParticipationMember {
-  user: User;
+  user: UserPublic;
 }
 
 export interface Participation {
