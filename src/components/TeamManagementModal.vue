@@ -35,6 +35,7 @@ const modalConfig = reactive({
   type: 'success' as 'success' | 'error' | 'confirm',
   title: '',
   message: '',
+  confirmText: 'Да',
   onConfirm: () => {}
 });
 
@@ -130,6 +131,7 @@ async function handleKickMember(userId: string) {
       showActionModal.value = false;
     }
   };
+  modalConfig.confirmText = 'Удалить';
   showActionModal.value = true;
 }
 
@@ -140,17 +142,29 @@ async function copyLink() {
     setTimeout(() => { copyButtonText.value = 'Копировать'; }, 2000);
   }
 }
-console.log('ДАННЫЕ УЧАСТНИКОВ:', props.currentParticipation?.members);
+
+async function handleMakeCaptain(userId: string) {
+  if (!props.currentParticipation) return;
+  modalConfig.onConfirm = async () => {
+    try {
+      await eventStore.transferCaptaincy(props.currentParticipation!.id, props.eventId, userId);
+    } finally { showActionModal.value = false; }
+  };
+  modalConfig.type = 'confirm';
+  modalConfig.title = 'Передача прав';
+  modalConfig.message = 'Вы уверены, что хотите назначить этого участника новым капитаном? Вы потеряете свои права.';
+  modalConfig.confirmText = 'Назначить';
+  showActionModal.value = true;
+}
 </script>
 
 <template>
   <div class="p-6">
-    <!-- VIEW 1: Пользователь УЖЕ в команде (панель управления) -->
+    <!-- VIEW 1: Управление своей командой -->
     <div v-if="currentParticipation">
-      <!-- ИЗМЕНЕНО: Заголовок стал крупнее, как на дизайне -->
       <h2 class="text-2xl font-bold mb-6">{{ currentParticipation.team_name }}</h2>
 
-      <div v-if="isCaptain" class="mb-6">
+      <div class="mb-6">
         <h3 class="font-semibold text-gray-800 mb-2">Пригласить в команду</h3>
         <div class="relative">
           <input type="text" readonly :value="inviteLink" class="w-full p-3 pr-10 border rounded-lg bg-gray-100 text-sm text-gray-600 focus:outline-none">
@@ -160,26 +174,35 @@ console.log('ДАННЫЕ УЧАСТНИКОВ:', props.currentParticipation?.me
         </div>
       </div>
 
-      <div>
+      <div class="mb-8">
         <h3 class="font-semibold text-gray-800 mb-2">Участники ({{ currentParticipation.members.length }})</h3>
-        <!-- ИЗМЕНЕНО: Улучшена верстка списка участников -->
         <ul class="space-y-2">
           <li v-for="member in currentParticipation.members" :key="member.user.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
-            <div class="flex items-center gap-3">
-              <img :src="resolveAvatarUrl(member.user.avatar_url) || '/img/icons/default-avatar.svg'" class="w-10 h-10 rounded-full object-cover bg-gray-200">
-              <span class="font-medium text-gray-900">
-                {{ member.user.full_name || 'Имя не указано' }}
-              </span>
+            <div class="flex items-center gap-3 min-w-0">
+              <img :src="resolveAvatarUrl(member.user.avatar_url)" class="w-10 h-10 rounded-full object-cover bg-gray-200 flex-shrink-0">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <!-- Сокращение имени (truncate) -->
+                <span class="font-medium text-gray-900 truncate" :title="member.user.full_name">{{ member.user.full_name }}</span>
+                <!-- Надпись "Капитан" -->
+                <span v-if="currentParticipation.creator.id === member.user.id" class="text-xs text-gray-500 font-medium">Капитан</span>
+              </div>
             </div>
-            <button v-if="isCaptain && authStore.user?.id !== member.user.id" @click="handleKickMember(member.user.id)" class="text-sm text-red-500 hover:underline px-2">Удалить</button>
+            <!-- Стилизованные кнопки управления -->
+            <div v-if="isCaptain && authStore.user?.id !== member.user.id" class="flex items-center gap-4 flex-shrink-0 ml-2">
+              <button @click="handleMakeCaptain(member.user.id)" class="text-sm font-medium text-primary hover:underline">Сделать капитаном</button>
+              <button @click="handleKickMember(member.user.id)" class="text-sm font-medium text-red-500 hover:underline">Удалить</button>
+            </div>
           </li>
         </ul>
       </div>
 
-      <!-- ИЗМЕНЕНО: Кнопка стала как на дизайне -->
-      <div class="mt-8 pt-6 border-t">
-        <button v-if="isCaptain" @click="handleDisbandTeam" class="w-full text-center p-3 font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">Расформировать команду</button>
-        <button v-else @click="handleLeaveTeam" class="w-full text-center p-3 font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">Выйти из команды</button>
+      <div class="pt-6 border-t space-y-3">
+        <button v-if="!isCaptain || (isCaptain && currentParticipation.members.length > 1)" @click="handleLeaveTeam" class="w-full text-center p-3 font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+          Выйти из команды
+        </button>
+        <button v-if="isCaptain" @click="handleDisbandTeam" class="w-full text-center p-3 font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          Расформировать команду
+        </button>
       </div>
     </div>
 

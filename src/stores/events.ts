@@ -6,10 +6,11 @@ import {
     createParticipationApi,
     joinTeamApi,
     deleteParticipationApi,
-    leaveOrKickApi
+    leaveOrKickApi,
+    transferCaptaincyApi
 } from '@/api/participations'
-import type {IEventCard, IEventDetail, Leader, Activity, Media, Participation} from '@/types'
-export type {IEventCard, IEventDetail, Leader, Activity, Media, Participation};
+import type { IEventCard, IEventDetail, Leader, Activity, Media, Participation } from '@/types'
+export type { IEventCard, IEventDetail, Leader, Activity, Media, Participation };
 
 export const useEventStore = defineStore('events', () => {
     const events = ref<IEventCard[]>([])
@@ -85,6 +86,11 @@ export const useEventStore = defineStore('events', () => {
         await fetchParticipations(eventId, true);
     }
 
+    async function transferCaptaincy(participationId: number, eventId: number, newCaptainId: string) {
+        await transferCaptaincyApi(participationId, newCaptainId);
+        await fetchParticipations(eventId, true);
+    }
+
 
     return {
         events,
@@ -99,6 +105,7 @@ export const useEventStore = defineStore('events', () => {
         createParticipation,
         joinTeam,
         deleteParticipation,
-        leaveOrKick
+        leaveOrKick,
+        transferCaptaincy
     }
 })

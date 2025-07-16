@@ -45,8 +45,6 @@ export const useAuthStore = defineStore('auth', () => {
     return '/img/icons/default-avatar.svg';
   });
 
-  const registeredEventIds = ref<number[]>([3]);
-
   function setToken(newToken: string | null) {
     token.value = newToken;
     if (newToken) {
@@ -139,7 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    token, user, isAuthenticated, userAvatar, registeredEventIds,
+    token, user, isAuthenticated, userAvatar, myParticipations,
     login, register, logout, setRedirectPath, checkAuth,
     updateProfile, changePassword, uploadAvatar, fetchMyParticipations,
   }

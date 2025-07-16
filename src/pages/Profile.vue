@@ -55,7 +55,13 @@ const avatarPreview = computed(() => {
 });
 const avatarInput = ref<HTMLInputElement | null>(null);
 
-const registeredEvents = computed(() => eventStore.events.filter(event => authStore.registeredEventIds.includes(event.id)));
+const registeredEvents = computed(() => {
+  if (!authStore.myParticipations.length || !eventStore.events.length) {
+    return [];
+  }
+  const participationEventIds = new Set(authStore.myParticipations.map(p => p.event_id));
+  return eventStore.events.filter(event => participationEventIds.has(event.id));
+});
 
 const panelLink = computed(() => {
   if (!authStore.user) return null;
@@ -163,7 +169,10 @@ const handlePasswordChange = async () => {
   }
 };
 
-onMounted(() => { eventStore.fetchEvents(); });
+onMounted(() => {
+  eventStore.fetchEvents();
+  authStore.fetchMyParticipations();
+});
 </script>
 
 <template>
@@ -200,8 +209,12 @@ onMounted(() => { eventStore.fetchEvents(); });
       </div>
 
       <h2 class="text-xl font-bold mb-4">Мои мероприятия</h2>
-      <div v-if="registeredEvents.length > 0" class="space-y-3"><EventCardSimple v-for="event in registeredEvents" :key="event.id" :event="event" /></div>
-      <p v-else class="text-center text-gray-500 bg-white p-6 rounded-lg shadow-sm">Вы пока не зарегистрированы на мероприятия.</p>
+      <div v-if="registeredEvents.length > 0" class="space-y-3">
+        <EventCardSimple v-for="event in registeredEvents" :key="event.id" :event="event" />
+      </div>
+      <p v-else class="text-center text-gray-500 bg-white p-6 rounded-lg shadow-sm">
+        Вы пока не зарегистрированы на мероприятия.
+      </p>
     </div>
 
     <!-- VIEW ДЛЯ ГОСТЯ -->

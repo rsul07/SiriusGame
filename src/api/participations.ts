@@ -36,3 +36,7 @@ export async function getMyParticipationsApi(): Promise<Participation[]> {
     const response = await api.get('/users/me/participations');
     return response.data;
 }
+
+export async function transferCaptaincyApi(participationId: number, newCaptainId: string): Promise<void> {
+    await api.patch(`/participations/${participationId}/transfer-captaincy/${newCaptainId}`);
+}
