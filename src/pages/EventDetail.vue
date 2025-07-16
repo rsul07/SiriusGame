@@ -8,6 +8,7 @@ import defaultImage from '../assets/default.png'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import TeamManagementModal from '@/components/TeamManagementModal.vue'
+import ActionModal from '@/components/ActionModal.vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -15,6 +16,14 @@ import {
   YandexMapMarker,
   YandexMapControls,
 } from 'vue-yandex-maps';
+
+const showActionModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error' | 'confirm',
+  title: '',
+  message: '',
+  onConfirm: () => {}
+});
 
 const route = useRoute()
 const router = useRouter()
@@ -147,36 +156,32 @@ function handleParticipate() {
     router.push({ name: 'Profile' })
     return
   }
-
   if (event.value?.is_team) {
     showTeamManagementModal.value = true;
   } else {
-    // Для индивидуального мероприятия просто переключаем регистрацию
-    authStore.toggleEventRegistration(event.value!.id);
-  }
-}
-
-async function handleTeamAction() {
-  if (teamAction.value === 'create' && !teamForm.name.trim()) {
-    alert('Пожалуйста, введите название команды.');
-    return;
-  }
-  teamIsLoading.value = true;
-  try {
-    if (teamAction.value === 'create') {
-      const result = await authStore.joinOrCreateTeam(teamAction.value, teamForm);
-      teamInviteLink.value = result.inviteLink;
-      teamModalStep.value = 'link';
+    if (isRegistered.value) {
+      modalConfig.type = 'confirm';
+      modalConfig.title = 'Отмена регистрации';
+      modalConfig.message = 'Вы уверены, что хотите отменить регистрацию на это мероприятие?';
+      modalConfig.onConfirm = () => {
+        authStore.toggleEventRegistration(event.value!.id);
+        showActionModal.value = false; // Закрываем окно подтверждения
+      };
+      showActionModal.value = true;
+    } else {
+      authStore.toggleEventRegistration(event.value!.id);
+      modalConfig.type = 'success';
+      modalConfig.title = 'Успешно!';
+      modalConfig.message = `Вы зарегистрировались на мероприятие "${event.value?.title}"!`;
+      showActionModal.value = true;
     }
-  } catch(e) {
-    alert('Произошла ошибка')
-  } finally {
-    teamIsLoading.value = false;
   }
 }
 
 function joinSelectedTeam(teamName: string) {
-  alert(`Вы отправили запрос на вступление в команду "${teamName}"`);
+  modalConfig.type = 'success';
+  modalConfig.title = 'Успешно';
+  modalConfig.message = `Вы отправили запрос на вступление в команду "${teamName}"`;
   showTeamModal.value = false;
 }
 
@@ -187,11 +192,15 @@ async function copyAndCloseInviteLink() {
 
 function getShareUrl() { return window.location.href; }
 async function copyShareLink() {
-  if (await copyToClipboard(getShareUrl())) {
+  const success = await copyToClipboard(getShareUrl());
+  if (success) {
     copyButtonText.value = 'Скопировано!';
     setTimeout(() => { copyButtonText.value = 'Копировать'; showShareMenu.value = false; }, 1500);
   } else {
-    alert('Не удалось скопировать ссылку.');
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = 'Ваш браузер не поддерживает автоматическое копирование. Пожалуйста, скопируйте ссылку вручную.';
+    showActionModal.value = true;
   }
 }
 
@@ -343,11 +352,25 @@ const openMapViewer = () => {
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
-    <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'" @submit.prevent="handleTeamAction"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
+    <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
     <!-- Модальное окно для УПРАВЛЕНИЯ КОМАНДОЙ -->
     <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
       <TeamManagementModal :event-id="event.id" @close="showTeamManagementModal = false" />
     </Modal>
+    <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
+      <TeamManagementModal 
+        @close="showTeamManagementModal = false"
+      />
+    </Modal>
+
+    <ActionModal 
+      :show="showActionModal"
+      :type="modalConfig.type"
+      :title="modalConfig.title"
+      :message="modalConfig.message"
+      @close="showActionModal = false"
+      @confirm="modalConfig.onConfirm"
+    />
 
     <!-- Полноэкранные вьюверы -->
     <Teleport to="body">

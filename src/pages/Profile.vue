@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router';
 import EventCardSimple from '@/components/EventCard.vue';
 import Modal from '@/components/Modal.vue';
 import { copyToClipboard } from '@/utils/clipboard';
+import ActionModal from '@/components/ActionModal.vue';
 
 const authStore = useAuthStore();
 const eventStore = useEventStore();
@@ -18,6 +19,13 @@ const copyIdText = ref('Копировать ID')
 const loginForm = reactive({ loginIdentifier: '', password: '' });
 const loginIsLoading = ref(false);
 const loginError = ref<string|null>(null);
+
+const showActionModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error',
+  title: '',
+  message: '',
+});
 
 const profileForm = reactive({
   fullName: '',
@@ -93,12 +101,19 @@ const onFileSelected = async (event: Event) => {
     try {
       await authStore.uploadAvatar(avatarFile.value);
       avatarFile.value = null;
-      alert('Аватар успешно обновлен!');
+      modalConfig.type = 'success';
+      modalConfig.title = 'Успешно';
+      modalConfig.message = 'Аватар обновлен!';
+      showActionModal.value = true;
     } catch (error) {
-      alert('Ошибка загрузки аватара.');
+      modalConfig.type = 'error';
+      modalConfig.title = 'Ошибка';
+      modalConfig.message = 'Не удалось загрузить аватар.';
+      showActionModal.value = true;
     }
   }
 };
+
 
 const handleProfileSave = async () => {
   try {
@@ -109,27 +124,42 @@ const handleProfileSave = async () => {
       birthday: profileForm.birthday,
       gender: profileForm.gender || undefined,
     });
-    alert('Профиль сохранен!');
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно';
+    modalConfig.message = 'Профиль сохранен!';
+    showActionModal.value = true;
     showSettings.value = false;
   } catch (error) {
-    alert('Ошибка сохранения профиля.');
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = 'Не удалось сохранить профиль.';
+    showActionModal.value = true;
   }
 };
 
 const handlePasswordChange = async () => {
   if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-    alert('Новые пароли не совпадают!');
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = 'Новые пароли не совпадают!';
+    showActionModal.value = true;
     return;
   }
   try {
     await authStore.changePassword(passwordForm);
-    alert('Пароль успешно изменен!');
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно';
+    modalConfig.message = 'Пароль изменен!';
+    showActionModal.value = true;
     passwordForm.oldPassword = '';
     passwordForm.newPassword = '';
     passwordForm.confirmNewPassword = '';
     showSettings.value = false;
   } catch (error) {
-    alert('Ошибка смены пароля. Проверьте старый пароль.');
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = 'Не удалось сменить пароль. Проверьте старый пароль.';
+    showActionModal.value = true;
   }
 };
 
@@ -217,5 +247,12 @@ onMounted(() => { eventStore.fetchEvents(); });
     <Modal :show="showLogoutConfirm" @close="showLogoutConfirm = false">
       <div class="p-6"><h3 class="text-lg font-bold">Подтверждение</h3><p class="my-4 text-gray-700">Вы уверены, что хотите выйти из аккаунта?</p><div class="flex justify-end gap-4 mt-6"><button @click="showLogoutConfirm = false" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Отмена</button><button @click="handleLogout" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Да, выйти</button></div></div>
     </Modal>
+    <ActionModal 
+      :show="showActionModal" 
+      :type="modalConfig.type"
+      :title="modalConfig.title"
+      :message="modalConfig.message"
+      @close="showActionModal = false"
+    />
   </div>
 </template>
