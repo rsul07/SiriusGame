@@ -1,18 +1,42 @@
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
+import ActionModal from '@/components/ActionModal.vue';
 
-const form = reactive({
+const form = reactive<{
+  eventId: number | null;
+  teamId: number | null;
+  points: number;
+}>({
   eventId: null,
   teamId: null,
   points: 0,
 })
 
+const showActionModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error',
+  title: '',
+  message: '',
+});
+
 const submitScore = () => {
   if (!form.eventId || !form.teamId || form.points === 0) {
-    alert('Пожалуйста, заполните все поля.');
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка валидации';
+    modalConfig.message = 'Пожалуйста, заполните все поля и укажите количество очков.';
+    showActionModal.value = true;
     return;
   }
-  alert(`Начислено ${form.points} очков команде #${form.teamId} в мероприятии #${form.eventId}`);
+
+  // Симуляция отправки на сервер
+  console.log(`Начислено ${form.points} очков команде #${form.teamId} в мероприятии #${form.eventId}`);
+  
+  modalConfig.type = 'success';
+  modalConfig.title = 'Успешно!';
+  modalConfig.message = `Очки успешно начислены.`;
+  showActionModal.value = true;
+
+  // Сбрасываем очки после успешной отправки
   form.points = 0;
 }
 </script>
@@ -52,5 +76,13 @@ const submitScore = () => {
         </div>
       </form>
     </div>
+
+    <ActionModal 
+      :show="showActionModal"
+      :type="modalConfig.type"
+      :title="modalConfig.title"
+      :message="modalConfig.message"
+      @close="showActionModal = false"
+    />
   </div>
 </template>

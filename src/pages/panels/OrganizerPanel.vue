@@ -3,6 +3,7 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
 import { createEventApi, updateEventApi, addEventMediaApi, deleteEventMediaApi, deleteEventApi } from '@/api/events';
 import EventCard from '@/components/EventCard.vue';
+import ActionModal from '@/components/ActionModal.vue';
 
 const eventStore = useEventStore();
 
@@ -20,35 +21,26 @@ const isTeam = computed({
   }
 });
 
-function validateEventForm() {
-  if (!form.data) return false;
-  if (form.data.is_team && (!form.data.max_teams || form.data.max_teams <= 0)) {
-    alert('Для командного мероприятия укажите максимальное число команд!');
-    return false;
-  }
-  if (!form.data.title || form.data.title.trim() === '') {
-    alert('Название мероприятия не может быть пустым!');
-    return false;
-  }
-  if (!form.data.date || !/^\d{2}\.\d{2}\.\d{4}$/.test(form.data.date)) {
-    alert('Укажите корректную дату в формате ДД.ММ.ГГГГ!');
-    return false;
-  }
-  if (!form.data.start_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.start_time)) {
-    alert('Укажите корректное время начала в формате ЧЧ:ММ!');
-    return false;
-  }
-  if (!form.data.end_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.end_time)) {
-    alert('Укажите корректное время окончания в формате ЧЧ:ММ!');
-    return false;
-  }
-  if (form.data.start_time >= form.data.end_time) {
-    alert('Время начала должно быть раньше времени окончания!');
-    return false;
-  }
-  return true;
+function validateEventForm(): string | null {
+  if (!form.data) return "Нет данных для сохранения.";
+  if (!form.data.title || form.data.title.trim() === '') return 'Название мероприятия не может быть пустым!';
+  if (!form.data.date || !/^\d{2}\.\d{2}\.\d{4}$/.test(form.data.date)) return 'Укажите корректную дату в формате ДД.ММ.ГГГГ!';
+  if (!form.data.start_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.start_time)) return 'Укажите корректное время начала в формате ЧЧ:ММ!';
+  if (!form.data.end_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.end_time)) return 'Укажите корректное время окончания в формате ЧЧ:ММ!';
+  if (form.data.start_time >= form.data.end_time) return 'Время начала должно быть раньше времени окончания!';
+  if (form.data.is_team && (!form.data.max_teams || form.data.max_teams <= 0)) return 'Для командного мероприятия укажите максимальное число команд!';
+  return null; // Возвращаем null, если ошибок нет
 }
+
 const isCreatingNew = ref(false);
+
+const showModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error' | 'confirm',
+  title: '',
+  message: '',
+  onConfirm: () => {}
+});
 
 const futureEvents = computed(() => eventStore.events.filter(e => e.state === 'future'));
 const currentEvents = computed(() => eventStore.events.filter(e => e.state === 'current'));
@@ -69,8 +61,8 @@ const createNewEvent = () => {
     title: 'Новое мероприятие',
     description: 'Описание мероприятия (сюда можно добавить правила, дополнительные условия, и т.д.)',
     date: new Date().toLocaleDateString('ru-RU'),
-    start_time: '00:00',
-    end_time: '23:59',
+    start_time: '09:00',
+    end_time: '23:00',
     is_team: false,
     max_members: 1,
   };
@@ -84,16 +76,29 @@ const backToSelection = () => {
   isCreatingNew.value = false;
 };
 
-const deleteEvent = async (event: IEventCard) => {
-  const confirmed = confirm(`Вы уверены, что хотите удалить мероприятие "${event.title}"?\n\nЭто действие нельзя отменить.`);
-  if (!confirmed) return;
-  
+const promptDeleteEvent = (event: IEventCard) => {
+  modalConfig.type = 'confirm';
+  modalConfig.title = 'Подтвердите удаление';
+  modalConfig.message = `Вы уверены, что хотите удалить мероприятие "${event.title}"? Это действие нельзя отменить.`;
+  modalConfig.onConfirm = () => deleteEvent(event.id);
+  showModal.value = true;
+};
+
+const deleteEvent = async (id: number) => {
   try {
-    await deleteEventApi(event.id);
-    alert('Мероприятие успешно удалено!');
+    await deleteEventApi(id);
+    showModal.value = false; // Закрываем окно подтверждения
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно';
+    modalConfig.message = 'Мероприятие удалено.';
+    showModal.value = true;
     await eventStore.fetchEvents(true);
   } catch (error: any) {
-    alert(`Ошибка при удалении: ${error.message}`);
+    showModal.value = false;
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = `Не удалось удалить мероприятие: ${error.message}`;
+    showModal.value = true;
   }
 };
 
@@ -118,7 +123,16 @@ const deleteEvent = async (event: IEventCard) => {
 // };
 
 const saveEvent = async () => {
-  if (!validateEventForm()) return;
+  if (!form.data) return;
+  
+  const validationError = validateEventForm();
+  if (validationError) {
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка валидации';
+    modalConfig.message = validationError;
+    showModal.value = true;
+    return;
+  }
   
   // Подготавливаем данные для отправки (без медиа)
   const { media, leaderboard, activities, id, state, preview_url, ...eventData } = form.data!;
@@ -138,23 +152,18 @@ const saveEvent = async () => {
     
     if (isCreatingNew.value) {
       eventId = await createEventApi(eventData);
-      alert('Мероприятие создано успешно!');
     } else {
       await updateEventApi(selectedEvent.value!.id, eventData);
       eventId = selectedEvent.value!.id;
       
-      // Удаляем все существующие медиа
       const existingMedia = selectedEvent.value!.media || [];
-      for (const media of existingMedia) {
+      for (const mediaItem of existingMedia) {
         try {
-          await deleteEventMediaApi(eventId, media.id);
-          console.log('Медиа удалено:', media.id);
+          await deleteEventMediaApi(eventId, mediaItem.id);
         } catch (error) {
-          console.warn('Не удалось удалить медиа:', media.id);
+          console.warn('Не удалось удалить старое медиа:', mediaItem.id);
         }
       }
-      
-      alert('Мероприятие сохранено успешно!');
     }
     
     // Добавляем новые медиа
@@ -184,9 +193,19 @@ const saveEvent = async () => {
     // Обновляем store
     await eventStore.fetchEvents(true);
     await eventStore.fetchEventById(eventId, true);
+
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно!';
+    modalConfig.message = isCreatingNew.value ? 'Мероприятие успешно создано.' : 'Изменения успешно сохранены.';
+    showModal.value = true;
+
     backToSelection();
+
   } catch (error: any) {
-    alert(`${error.message}`);
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка!';
+    modalConfig.message = `Не удалось сохранить данные: ${error.message}`;
+    showModal.value = true;
   }
 }
 
@@ -212,7 +231,7 @@ onMounted(() => {
               <EventCard :event="event" class="flex-grow"/>
               <div class="flex gap-2 mt-2">
                 <button @click="selectEventForEditing(event)" class="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Редактировать</button>
-                <button @click="deleteEvent(event)" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Удалить</button>
+                <button @click="promptDeleteEvent(event)" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Удалить</button>
               </div>
             </div>
             <div v-if="events.length === 0" class="col-span-3">
@@ -304,5 +323,13 @@ onMounted(() => {
         </form>
       </div>
     </div>
+    <ActionModal 
+      :show="showModal" 
+      :type="modalConfig.type"
+      :title="modalConfig.title"
+      :message="modalConfig.message"
+      @close="showModal = false"
+      @confirm="modalConfig.onConfirm"
+    />
   </div>
 </template> 

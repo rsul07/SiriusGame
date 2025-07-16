@@ -36,18 +36,6 @@ export const useEventStore = defineStore('events', () => {
     error.value = null
     try {
       const data = await fetchEventByIdApi(id);
-      
-      // --- ДОБАВЛЯЕМ МОК-ДАННЫЕ ДЛЯ ТЕСТА ---
-      if (data.id === 3) {
-        data.activities = [
-          { id: 101, name: 'Финальная гонка роботов, которая определит победителя', icon: '🏁', is_scoreable: true, is_versus: true, max_score: 100, start_dt: '2024-07-25T14:00:00Z', end_dt: '2024-07-25T15:00:00Z' },
-          { id: 102, name: 'Тех-питстоп и ремонт', icon: '🛠️', is_scoreable: true, is_versus: false, max_score: 50, start_dt: '2024-07-25T15:00:00Z', end_dt: '2024-07-25T16:00:00Z' },
-          { id: 103, name: 'Спич от главного спонсора мероприятия', icon: '🎤', is_scoreable: false, is_versus: false, start_dt: '2024-07-25T16:30:00Z', end_dt: null },
-          { id: 104, name: 'Церемония награждения', icon: '🏆', is_scoreable: false, is_versus: false, start_dt: '2024-07-25T17:00:00Z', end_dt: '2024-07-25T17:30:00Z' },
-        ]
-      }
-      // --- КОНЕЦ МОК-ДАННЫХ ---
-      
       detailedEvents.value[id] = data;
       return data;
     } catch (err: any) {

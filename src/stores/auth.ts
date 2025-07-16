@@ -161,10 +161,8 @@ export const useAuthStore = defineStore('auth', () => {
     const index = registeredEventIds.value.indexOf(eventId);
     if (index > -1) {
       registeredEventIds.value.splice(index, 1);
-      alert('Регистрация отменена!');
     } else {
       registeredEventIds.value.push(eventId);
-      alert('Вы успешно зарегистрировались на мероприятие!');
     }
   }
 
