@@ -34,10 +34,10 @@ watch(
     padding-bottom: env(safe-area-inset-bottom) -> отступ снизу, чтобы контент не заезжал под системную панель навигации.
   -->
   <div class="h-screen bg-bgMain" style="padding-top: env(safe-area-inset-top);">
-    <main class="flex-1 overflow-y-auto pb-16 h-full">
+    <main class="flex-1 overflow-y-auto pb-16">
       <RouterView v-slot="{ Component, route }">
         <Transition :name="transitionName" mode="out-in">
-          <div :key="route.name" class="absolute w-full h-full">
+          <div :key="route.name">
             <component :is="Component" />
           </div>
         </Transition>
