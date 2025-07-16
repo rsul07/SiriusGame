@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useEventStore, type IEventDetail, type Media, type Activity } from '@/stores/events'
+import { useEventStore, type IEventDetail, type Media, type Activity, type Participation } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
+import ActionModal from '@/components/ActionModal.vue';
+import TeamManagementModal from '@/components/TeamManagementModal.vue'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import { copyToClipboard } from '@/utils/clipboard'
-import TeamManagementModal from '@/components/TeamManagementModal.vue'
-import ActionModal from '@/components/ActionModal.vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -16,14 +16,6 @@ import {
   YandexMapMarker,
   YandexMapControls,
 } from 'vue-yandex-maps';
-
-const showActionModal = ref(false);
-const modalConfig = reactive({
-  type: 'success' as 'success' | 'error' | 'confirm',
-  title: '',
-  message: '',
-  onConfirm: () => {}
-});
 
 const route = useRoute()
 const router = useRouter()
@@ -34,41 +26,115 @@ const event = ref<IEventDetail | null>(null)
 const isLoadingPage = ref(true)
 const errorPage = ref<string | null>(null)
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
-const showShareMenu = ref(false)
+const showTeamManagementModal = ref(false) // <- Единственная переменная для модалки
 
+const showShareMenu = ref(false)
 const isImageViewerOpen = ref(false)
 const isMapViewerOpen = ref(false)
 const currentImageIndex = ref(0)
 const imageRotation = ref(0)
 const copyButtonText = ref('Копировать')
 
-const showTeamModal = ref(false)
-const teamModalStep = ref<'choice' | 'form' | 'list' | 'link'>('choice')
-const teamAction = ref<'join' | 'create'>('create')
-const teamForm = reactive({ name: '' })
-const teamInviteLink = ref('')
-const teamIsLoading = ref(false)
+// --- Логика для ActionModal ---
+const showActionModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error' | 'confirm',
+  title: '',
+  message: '',
+  onConfirm: () => {}
+});
 
-const showTeamManagementModal = ref(false);
 
-const isRegistered = computed(() => {
-    if (!event.value) return false;
-    return authStore.registeredEventIds.includes(event.value.id);
+// --- Главные вычисляемые свойства (Computed Properties) ---
+const eventParticipations = computed((): Participation[] => {
+  if (!event.value) return [];
+  return eventStore.participationsByEvent[event.value.id] || [];
 })
 
-const foundTeams = ref([
-  { id: 1, name: 'CyberDudes', members: 3, maxMembers: 5 },
-  { id: 2, name: 'RoboFriends', members: 5, maxMembers: 5 },
-  { id: 3, name: 'TechnoWarriors', members: 2, maxMembers: 5 },
-  { id: 4, name: 'Code Ninjas', members: 4, maxMembers: 5 },
-  { id: 5, name: 'Data Dragons', members: 1, maxMembers: 5 },
-])
-
-const teamSearchQuery = ref('')
-const filteredTeams = computed(() => {
-  if (!teamSearchQuery.value) { return foundTeams.value }
-  return foundTeams.value.filter(team => team.name.toLowerCase().includes(teamSearchQuery.value.toLowerCase()))
+const currentUserParticipation = computed(() => {
+  if (!authStore.user || !event.value) return null;
+  return eventParticipations.value.find(p =>
+      p.members.some(m => m.user.id === authStore.user!.id)
+  ) || null;
 })
+
+const isCaptain = computed(() => {
+  if (!authStore.user || !currentUserParticipation.value) return false;
+  return currentUserParticipation.value.creator.id === authStore.user.id;
+})
+
+const isRegistered = computed(() => !!currentUserParticipation.value);
+
+
+// --- Загрузка данных ---
+async function loadEventData(id: string) {
+  isLoadingPage.value = true;
+  errorPage.value = null;
+  const eventId = parseInt(id);
+  try {
+    const [foundEvent] = await Promise.all([
+      eventStore.fetchEventById(eventId, true),
+      eventStore.fetchParticipations(eventId, true)
+    ]);
+    if (!foundEvent) throw new Error("Мероприятие не найдено");
+    event.value = foundEvent;
+    activeSubTab.value = event.value.state === 'current' ? 'activities' : 'description'
+  } catch (e: any) {
+    errorPage.value = e.message;
+  } finally {
+    isLoadingPage.value = false;
+  }
+}
+
+onMounted(() => { loadEventData(route.params.id as string); })
+watch(() => route.params.id, (newId) => { if (newId) loadEventData(newId as string); })
+
+
+// --- Обработчики действий пользователя ---
+function handleParticipate() {
+  if (!authStore.isAuthenticated) {
+    authStore.setRedirectPath(route.fullPath);
+    router.push({ name: 'Profile' });
+    return;
+  }
+  if (event.value?.is_team) {
+    showTeamManagementModal.value = true;
+  } else {
+    if (isRegistered.value) {
+      modalConfig.type = 'confirm';
+      modalConfig.title = 'Отмена регистрации';
+      modalConfig.message = 'Вы уверены, что хотите отменить регистрацию на это мероприятие?';
+      modalConfig.onConfirm = async () => {
+        if (!event.value || !currentUserParticipation.value) return;
+        try {
+          await eventStore.deleteParticipation(currentUserParticipation.value.id, event.value.id);
+          await authStore.fetchMyParticipations();
+          showActionModal.value = false;
+        } catch (error) {}
+      };
+      showActionModal.value = true;
+    } else {
+      handleIndividualParticipation();
+    }
+  }
+}
+
+async function handleIndividualParticipation() {
+  if (!event.value) return;
+  try {
+    await eventStore.createParticipation(event.value.id, { participant_type: 'individual' });
+    await authStore.fetchMyParticipations();
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно!';
+    modalConfig.message = `Вы зарегистрировались на мероприятие "${event.value?.title}"!`;
+    showActionModal.value = true;
+  } catch (error: any) {
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = error.response?.data?.detail || 'Не удалось зарегистрироваться.';
+    showActionModal.value = true;
+  }
+}
 
 const leaders = computed(() => event.value?.leaderboard || [])
 const topThree = computed(() => leaders.value.slice(0, 3))
@@ -129,67 +195,6 @@ const formatTime = (dateStr?: string | null, timeStr?: string | null) => {
   const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
   return dateObj.toLocaleTimeString('ru-RU', options);
 }
-
-async function loadEventData(id: string) {
-  isLoadingPage.value = true;
-  errorPage.value = null;
-  const eventId = parseInt(id);
-
-  try {
-    const foundEvent = await eventStore.fetchEventById(eventId, true);
-    if (!foundEvent) throw new Error("Мероприятие не найдено");
-    event.value = foundEvent;
-    activeSubTab.value = event.value.state === 'current' ? 'activities' : 'description'
-  } catch (e: any) {
-    errorPage.value = e.message;
-  } finally {
-    isLoadingPage.value = false;
-  }
-}
-
-onMounted(async () => { await loadEventData(route.params.id as string); })
-watch(() => route.params.id, async (newId) => { if (newId) await loadEventData(newId as string); })
-
-function handleParticipate() {
-  if (!authStore.isAuthenticated) {
-    authStore.setRedirectPath(route.fullPath)
-    router.push({ name: 'Profile' })
-    return
-  }
-  if (event.value?.is_team) {
-    showTeamManagementModal.value = true;
-  } else {
-    if (isRegistered.value) {
-      modalConfig.type = 'confirm';
-      modalConfig.title = 'Отмена регистрации';
-      modalConfig.message = 'Вы уверены, что хотите отменить регистрацию на это мероприятие?';
-      modalConfig.onConfirm = () => {
-        authStore.toggleEventRegistration(event.value!.id);
-        showActionModal.value = false; // Закрываем окно подтверждения
-      };
-      showActionModal.value = true;
-    } else {
-      authStore.toggleEventRegistration(event.value!.id);
-      modalConfig.type = 'success';
-      modalConfig.title = 'Успешно!';
-      modalConfig.message = `Вы зарегистрировались на мероприятие "${event.value?.title}"!`;
-      showActionModal.value = true;
-    }
-  }
-}
-
-function joinSelectedTeam(teamName: string) {
-  modalConfig.type = 'success';
-  modalConfig.title = 'Успешно';
-  modalConfig.message = `Вы отправили запрос на вступление в команду "${teamName}"`;
-  showTeamModal.value = false;
-}
-
-async function copyAndCloseInviteLink() {
-  if (await copyToClipboard(teamInviteLink.value)) alert('Ссылка скопирована!');
-  showTeamModal.value = false;
-}
-
 function getShareUrl() { return window.location.href; }
 async function copyShareLink() {
   const success = await copyToClipboard(getShareUrl());
@@ -216,6 +221,7 @@ const openImageViewer = (index: number) => {
 const openMapViewer = () => {
   isMapViewerOpen.value = true;
 }
+
 </script>
 
 <template>
@@ -290,7 +296,7 @@ const openMapViewer = () => {
             <ul class="space-y-3">
               <li v-for="activity in scoreableActivities" :key="activity.id" class="flex items-start gap-4 p-4 rounded-lg shadow-sm border" :class="activity.is_versus ? 'bg-primary/5 border-primary/20' : 'bg-white border-transparent'">
                 <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '🏆' }}</span>
-                
+
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
                   <!-- Блок с временем -->
@@ -352,18 +358,16 @@ const openMapViewer = () => {
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
-    <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
-    <!-- Модальное окно для УПРАВЛЕНИЯ КОМАНДОЙ -->
-    <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
-      <TeamManagementModal :event-id="event.id" @close="showTeamManagementModal = false" />
-    </Modal>
-    <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
-      <TeamManagementModal 
+    <TeamManagementModal
+        v-if="showTeamManagementModal"
+        :event-id="event.id"
+        :current-participation="currentUserParticipation"
+        :is-captain="isCaptain"
+        :all-teams="eventParticipations.filter(p => p.participant_type === 'team')"
         @close="showTeamManagementModal = false"
-      />
-    </Modal>
+    />
 
-    <ActionModal 
+    <ActionModal
       :show="showActionModal"
       :type="modalConfig.type"
       :title="modalConfig.title"

@@ -14,8 +14,8 @@ export interface User {
   birthday?: string;
   gender?: 'male' | 'female';
   is2FAEnabled?: boolean;
-  teamId?: number | null; // <-- ДОБАВЛЕНО
-  isCaptain?: boolean;    // <-- ДОБАВЛЕНО
+  teamId?: number | null;
+  isCaptain?: boolean;
 }
 
 export interface Activity {
@@ -61,4 +61,17 @@ export interface RegisterFormData {
   password: string;
   birthday: string;
   gender: 'male' | 'female';
+}
+
+export interface ParticipationMember {
+  user: User;
+}
+
+export interface Participation {
+  id: number;
+  event_id: number;
+  participant_type: 'individual' | 'team';
+  team_name: string | null;
+  creator: User;
+  members: ParticipationMember[];
 }

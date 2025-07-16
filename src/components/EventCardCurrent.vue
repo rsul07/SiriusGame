@@ -8,7 +8,6 @@ const props = defineProps<{
   event: IEventCard 
 }>()
 
-// --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
 const imageUrl = computed(() => {
   if (props.event?.preview_url) {
     return props.event.preview_url;
