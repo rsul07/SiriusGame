@@ -45,7 +45,7 @@ const emit = defineEmits(['close', 'confirm']);
           class="px-6 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Отмена
         </button>
         <button v-if="props.type === 'confirm'" @click="emit('confirm')" 
-          class="px-6 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Удалить
+          class="px-6 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">{{ props.confirmText || 'Да' }}
         </button>
         <button v-if="props.type !== 'confirm'" @click="emit('close')" 
           class="w-full px-6 py-2 rounded-md bg-primary text-white hover:opacity-90">ОК
