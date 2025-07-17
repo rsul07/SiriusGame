@@ -1,5 +1,5 @@
 import api from './index';
-import type { IEventCard, IEventDetail, Media } from '@/types'
+import type { IEventCard, IEventDetail, Media, Activity } from '@/types'
 
 // Общая функция маппинга
 function mapEventData(eventData: any) {
@@ -87,5 +87,37 @@ export async function deleteEventApi(eventId: number): Promise<boolean> {
     return response.data.ok;
   } catch (error) {
     throw new Error('Не удалось удалить мероприятие');
+  }
+}
+
+// ===== УПРАВЛЕНИЕ АКТИВНОСТЯМИ =====
+
+// Добавляет активность к мероприятию
+export async function addActivityApi(eventId: number, activityData: Partial<Activity>): Promise<boolean> {
+  try {
+    const response = await api.post(`/events/${eventId}/activities`, activityData);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось добавить активность');
+  }
+}
+
+// Обновляет активность
+export async function updateActivityApi(activityId: number, activityData: Partial<Activity>): Promise<boolean> {
+  try {
+    const response = await api.patch(`/activities/${activityId}`, activityData);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось обновить активность');
+  }
+}
+
+// Удаляет активность
+export async function deleteActivityApi(activityId: number): Promise<boolean> {
+  try {
+    const response = await api.delete(`/activities/${activityId}`);
+    return response.data.ok;
+  } catch (error) {
+    throw new Error('Не удалось удалить активность');
   }
 }
