@@ -1,108 +1,95 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useEventStore, type IEventCard, type IEventDetail } from '@/stores/events';
-import { createEventApi, updateEventApi, addEventMediaApi, deleteEventMediaApi, deleteEventApi, addActivityApi, updateActivityApi, deleteActivityApi } from '@/api/events';
 import EventCard from '@/components/EventCard.vue';
 import ActionModal from '@/components/ActionModal.vue';
+import { useEventForm } from '@/composables/useEventForm';
+import { useModal } from '@/composables/useModal';
+import { useActivities } from '@/composables/useActivities';
+import { useEventOperations } from '@/composables/useEventOperations';
 
 const eventStore = useEventStore();
 
+// Композабл-функции
+const { 
+  form, 
+  isCreatingNew, 
+  isTeam, 
+  validateEventForm, 
+  createNewEventForm, 
+  setFormData, 
+  resetForm 
+} = useEventForm();
+
+const { 
+  showModal, 
+  modalConfig, 
+  showSuccessModal, 
+  showErrorModal, 
+  showConfirmModal, 
+  closeModal 
+} = useModal();
+
+const {
+  selectedEventForActivities,
+  addActivityToSelected,
+  removeActivityFromSelected,
+  isTemporaryId,
+  deleteActivityById,
+  saveActivities: saveActivitiesComposable,
+  setSelectedEventForActivities
+} = useActivities();
+
+const {
+  createEvent,
+  updateEvent,
+  deleteEvent: deleteEventOperation,
+  handleEventMedia,
+  refreshEventData
+} = useEventOperations();
+
+// Локальное состояние
 const selectedEvent = ref<IEventDetail | null>(null);
-const form = reactive<{ data: Partial<IEventDetail> | null }>({ data: null });
-const isTeam = computed({
-  get: () => !!form.data?.is_team,
-  set: (val: boolean) => {
-    if (form.data) {
-      form.data.is_team = val;
-      if (!val) {
-        form.data.max_teams = undefined;
-      }
-    }
-  }
-});
-
-function validateEventForm(): string | null {
-  if (!form.data) return "Нет данных для сохранения.";
-  if (!form.data.title || form.data.title.trim() === '') return 'Название мероприятия не может быть пустым!';
-  if (!form.data.date || !/^\d{2}\.\d{2}\.\d{4}$/.test(form.data.date)) return 'Укажите корректную дату в формате ДД.ММ.ГГГГ!';
-  if (!form.data.start_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.start_time)) return 'Укажите корректное время начала в формате ЧЧ:ММ!';
-  if (!form.data.end_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(form.data.end_time)) return 'Укажите корректное время окончания в формате ЧЧ:ММ!';
-  if (form.data.start_time >= form.data.end_time) return 'Время начала должно быть раньше времени окончания!';
-  if (form.data.is_team && (!form.data.max_teams || form.data.max_teams <= 0)) return 'Для командного мероприятия укажите максимальное число команд!';
-  return null; // Возвращаем null, если ошибок нет
-}
-
-const isCreatingNew = ref(false);
-
-// Состояние для вкладок
 const activeTab = ref<'events' | 'activities'>('events');
-const selectedEventForActivities = ref<IEventDetail | null>(null);
-
-const showModal = ref(false);
-const modalConfig = reactive({
-  type: 'success' as 'success' | 'error' | 'confirm',
-  title: '',
-  message: '',
-  onConfirm: () => {}
-});
 
 const futureEvents = computed(() => eventStore.events.filter(e => e.state === 'future'));
 const currentEvents = computed(() => eventStore.events.filter(e => e.state === 'current'));
 const pastEvents = computed(() => eventStore.events.filter(e => e.state === 'past'));
 
 const selectEventForEditing = async (card: IEventCard) => {
-  // ИСПОЛЬЗУЕМ JSON.parse/stringify ВМЕСТО structuredClone
-  // Это гарантированно создаст чистую, глубокую копию объекта данных
-    const full = await eventStore.fetchEventById(card.id)
-    if (!full) return
-    form.data = JSON.parse(JSON.stringify(full))   // deep copy
-    selectedEvent.value = full
-    isCreatingNew.value = false
+  const full = await eventStore.fetchEventById(card.id);
+  if (!full) return;
+  
+  setFormData(full, false);
+  selectedEvent.value = full;
 };
 
 const createNewEvent = () => {
-  form.data = {
-    title: 'Новое мероприятие',
-    description: 'Описание мероприятия (сюда можно добавить правила, дополнительные условия, и т.д.)',
-    date: new Date().toLocaleDateString('ru-RU'),
-    start_time: '09:00',
-    end_time: '23:00',
-    is_team: false,
-    max_members: 1,
-  };
-  isCreatingNew.value = true;
+  createNewEventForm();
   selectedEvent.value = form.data as IEventDetail;
 };
 
 const backToSelection = () => {
   selectedEvent.value = null;
-  form.data = null;
-  isCreatingNew.value = false;
+  resetForm();
 };
 
 const promptDeleteEvent = (event: IEventCard) => {
-  modalConfig.type = 'confirm';
-  modalConfig.title = 'Подтвердите удаление';
-  modalConfig.message = `Вы уверены, что хотите удалить мероприятие "${event.title}"? Это действие нельзя отменить.`;
-  modalConfig.onConfirm = () => deleteEvent(event.id);
-  showModal.value = true;
+  showConfirmModal(
+    'Подтвердите удаление',
+    `Вы уверены, что хотите удалить мероприятие "${event.title}"? Это действие нельзя отменить.`,
+    () => deleteEventHandler(event.id)
+  );
 };
 
-const deleteEvent = async (id: number) => {
+const deleteEventHandler = async (id: number) => {
   try {
-    await deleteEventApi(id);
-    showModal.value = false; // Закрываем окно подтверждения
-    modalConfig.type = 'success';
-    modalConfig.title = 'Успешно';
-    modalConfig.message = 'Мероприятие удалено.';
-    showModal.value = true;
+    await deleteEventOperation(id);
+    closeModal();
+    showSuccessModal('Успешно', 'Мероприятие удалено.');
     await eventStore.fetchEvents(true);
   } catch (error: any) {
-    showModal.value = false;
-    modalConfig.type = 'error';
-    modalConfig.title = 'Ошибка';
-    modalConfig.message = `Не удалось удалить мероприятие: ${error.message}`;
-    showModal.value = true;
+    showErrorModal('Ошибка', `Не удалось удалить мероприятие: ${error.message}`);
   }
 };
 
@@ -111,66 +98,43 @@ const deleteEvent = async (id: number) => {
 const switchToActivitiesTab = async (event: IEventCard) => {
   const full = await eventStore.fetchEventById(event.id);
   if (!full) return;
-  selectedEventForActivities.value = full;
+  setSelectedEventForActivities(full);
   activeTab.value = 'activities';
 };
 
 const selectEventForActivities = async (eventId: number) => {
   const full = await eventStore.fetchEventById(eventId);
   if (!full) return;
-  selectedEventForActivities.value = full;
+  setSelectedEventForActivities(full);
 };
 
 // ===== УПРАВЛЕНИЕ АКТИВНОСТЯМИ =====
-
-const addActivityToSelected = () => {
-  if (!selectedEventForActivities.value) return;
-  if (!selectedEventForActivities.value.activities) selectedEventForActivities.value.activities = [];
-  selectedEventForActivities.value.activities.push({
-    id: Date.now(), // временный ID для новых активностей
-    name: 'Новая активность',
-    icon: '🎯',
-    latitude: 0,
-    longitude: 0,
-    is_scoreable: false,
-    is_versus: false,
-    max_score: 1,
-    start_dt: null,
-    end_dt: null
-  });
-};
 
 const deleteActivityFromSelected = async (activity: any, index: number) => {
   if (!selectedEventForActivities.value?.activities) return;
   
   // Если активность имеет реальный ID (не временный), удаляем с сервера
-  if (activity.id && activity.id < Date.now() - 1000000) { // проверяем что это не временный ID
-    modalConfig.type = 'confirm';
-    modalConfig.title = 'Подтвердите удаление';
-    modalConfig.message = `Вы уверены, что хотите удалить активность "${activity.name}"?`;
-    modalConfig.onConfirm = async () => {
-      try {
-        await deleteActivityApi(activity.id);
-        selectedEventForActivities.value!.activities!.splice(index, 1);
-        showModal.value = false;
-        modalConfig.type = 'success';
-        modalConfig.title = 'Успешно';
-        modalConfig.message = 'Активность удалена.';
-        showModal.value = true;
-        // Обновляем данные в store
-        await eventStore.fetchEventById(selectedEventForActivities.value!.id, true);
-      } catch (error: any) {
-        showModal.value = false;
-        modalConfig.type = 'error';
-        modalConfig.title = 'Ошибка';
-        modalConfig.message = `Не удалось удалить активность: ${error.message}`;
-        showModal.value = true;
+  if (activity.id && !isTemporaryId(activity.id)) {
+    showConfirmModal(
+      'Подтвердите удаление',
+      `Вы уверены, что хотите удалить активность "${activity.name}"?`,
+      async () => {
+        try {
+          await deleteActivityById(activity.id);
+          removeActivityFromSelected(index);
+          closeModal();
+          showSuccessModal('Успешно', 'Активность удалена.');
+          // Обновляем данные в store
+          await eventStore.fetchEventById(selectedEventForActivities.value!.id, true);
+        } catch (error: any) {
+          closeModal();
+          showErrorModal('Ошибка', `Не удалось удалить активность: ${error.message}`);
+        }
       }
-    };
-    showModal.value = true;
+    );
   } else {
     // Просто удаляем из локального массива для новых активностей
-    selectedEventForActivities.value.activities.splice(index, 1);
+    removeActivityFromSelected(index);
   }
 };
 
@@ -179,51 +143,18 @@ const saveActivities = async () => {
 
   try {
     const eventId = selectedEventForActivities.value.id;
-    
-    // Обрабатываем активности
-    for (const activity of selectedEventForActivities.value.activities) {
-      const { id: activityId, ...activityData } = activity;
-      
-      // Подготавливаем данные активности
-      const cleanActivityData = {
-        name: activityData.name,
-        icon: activityData.icon,
-        latitude: activityData.latitude || 0,
-        longitude: activityData.longitude || 0,
-        is_scoreable: activityData.is_scoreable || false,
-        is_versus: activityData.is_versus || false,
-        max_score: activityData.max_score || 1,
-        start_dt: activityData.start_dt,
-        end_dt: activityData.end_dt
-      };
-      
-      if (activityId && activityId < Date.now() - 1000000) {
-        // Обновляем существующую активность
-        await updateActivityApi(activityId, cleanActivityData);
-        console.log('Активность обновлена:', activity.name);
-      } else {
-        // Создаем новую активность
-        await addActivityApi(eventId, cleanActivityData);
-        console.log('Активность добавлена:', activity.name);
-      }
-    }
+    await saveActivitiesComposable();
     
     // Обновляем данные в store
     await eventStore.fetchEventById(eventId, true);
     
-    modalConfig.type = 'success';
-    modalConfig.title = 'Успешно!';
-    modalConfig.message = 'Активности сохранены.';
-    showModal.value = true;
+    showSuccessModal('Успешно!', 'Активности сохранены.');
     
     // Обновляем локальные данные
     await selectEventForActivities(eventId);
     
   } catch (error: any) {
-    modalConfig.type = 'error';
-    modalConfig.title = 'Ошибка!';
-    modalConfig.message = `Не удалось сохранить активности: ${error.message}`;
-    showModal.value = true;
+    showErrorModal('Ошибка!', `Не удалось сохранить активности: ${error.message}`);
   }
 };
 
@@ -232,85 +163,41 @@ const saveEvent = async () => {
   
   const validationError = validateEventForm();
   if (validationError) {
-    modalConfig.type = 'error';
-    modalConfig.title = 'Ошибка валидации';
-    modalConfig.message = validationError;
-    showModal.value = true;
+    showErrorModal('Ошибка валидации', validationError);
     return;
   }
-  
-  // Подготавливаем данные для отправки (без медиа и активностей)
-  const { media, leaderboard, activities, id, state, preview_url, ...eventData } = form.data!;
-
-  if (eventData.date) {
-    eventData.date = eventData.date.replace(/(\d{2})\.(\d{2})\.(\d{4})/, '$3-$2-$1'); 
-  }
-  
-  if (eventData.max_teams == undefined) {
-    delete eventData.max_teams; 
-  }
-
-  // console.log(eventData)
   
   try {
     let eventId: number;
     
     if (isCreatingNew.value) {
-      eventId = await createEventApi(eventData);
+      eventId = await createEvent(form.data);
     } else {
-      await updateEventApi(selectedEvent.value!.id, eventData);
+      await updateEvent(selectedEvent.value!.id, form.data);
       eventId = selectedEvent.value!.id;
       
+      // Обрабатываем медиа файлы
       const existingMedia = selectedEvent.value!.media || [];
-      for (const mediaItem of existingMedia) {
-        try {
-          await deleteEventMediaApi(eventId, mediaItem.id);
-        } catch (error) {
-          console.warn('Не удалось удалить старое медиа:', mediaItem.id);
-        }
-      }
+      await handleEventMedia(eventId, existingMedia);
     }
     
-    // Добавляем новые медиа
-    const mediaTypes: Array<'image' | 'document'> = ['image', 'document'];
-    for (const mediaType of mediaTypes) {
-      const urls = (document.querySelector(`textarea[data-media-type="${mediaType}"]`) as HTMLTextAreaElement)?.value
-        .split('\n')
-        .filter(url => url.trim());
-
-      for (let i = 0; i < urls.length; i++) {
-        try {
-          const url = urls[i].trim();
-          const fileName = url.split('/').pop() || `${mediaType}_${i + 1}`;
-          await addEventMediaApi(eventId, {
-            url: url,
-            media_type: mediaType,
-            name: fileName,
-            order: i
-          });
-          console.log(`Добавлено ${mediaType}:`, url);
-        } catch (error) {
-          console.warn(`Не удалось добавить ${mediaType}:`, urls[i]);
-        }
-      }
+    // Если это создание нового события, также обрабатываем медиа
+    if (isCreatingNew.value) {
+      await handleEventMedia(eventId);
     }
     
     // Обновляем store
-    await eventStore.fetchEvents(true);
-    await eventStore.fetchEventById(eventId, true);
+    await refreshEventData(eventId);
 
-    modalConfig.type = 'success';
-    modalConfig.title = 'Успешно!';
-    modalConfig.message = isCreatingNew.value ? 'Мероприятие успешно создано.' : 'Изменения успешно сохранены.';
-    showModal.value = true;
+    showSuccessModal(
+      'Успешно!', 
+      isCreatingNew.value ? 'Мероприятие успешно создано.' : 'Изменения успешно сохранены.'
+    );
 
     backToSelection();
 
   } catch (error: any) {
-    modalConfig.type = 'error';
-    modalConfig.title = 'Ошибка!';
-    modalConfig.message = `Не удалось сохранить данные: ${error.message}`;
-    showModal.value = true;
+    showErrorModal('Ошибка!', `Не удалось сохранить данные: ${error.message}`);
   }
 }
 
@@ -560,7 +447,7 @@ onMounted(() => {
       :type="modalConfig.type"
       :title="modalConfig.title"
       :message="modalConfig.message"
-      @close="showModal = false"
+      @close="closeModal"
       @confirm="modalConfig.onConfirm"
     />
   </div>
