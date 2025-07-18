@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
 import ActionModal from '@/components/ActionModal.vue';
+import JudgeModal from '@/components/JudgeModal.vue';
 import TeamManagementModal from '@/components/TeamManagementModal.vue'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -27,6 +28,7 @@ const isLoadingPage = ref(true)
 const errorPage = ref<string | null>(null)
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
 const showTeamManagementModal = ref(false)
+const showJudgeModal = ref(false)
 
 const showShareMenu = ref(false)
 const isImageViewerOpen = ref(false)
@@ -238,6 +240,19 @@ async function copyShareLink() {
   }
 }
 
+const isCurrentUserJudge = computed(() => {
+  if (!authStore.user || !event.value) return false;
+  return eventStore.judgesByEvent[event.value.id]?.some(j => j.user.id === authStore.user!.id) || false;
+});
+
+onMounted(async () => {
+  const eventId = parseInt(route.params.id as string);
+  await Promise.all([
+    loadEventData(route.params.id as string),
+    eventStore.fetchJudges(eventId)
+  ]);
+})
+
 const nextImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length }
 const prevImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length }
 const rotateImage = () => { imageRotation.value += 90 }
@@ -250,7 +265,6 @@ const openImageViewer = (index: number) => {
 const openMapViewer = () => {
   isMapViewerOpen.value = true;
 }
-
 </script>
 
 <template>
@@ -354,16 +368,32 @@ const openMapViewer = () => {
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
 
-    <!-- Футер с кнопкой регистрации -->
-    <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
+    <!-- Футер -->
+    <footer v-if="event.state !== 'past'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
       <div class="max-w-md mx-auto">
-        <div class="flex justify-between items-center mb-4 text-center">
+        <!-- Блок с информацией о дате/времени (остается) -->
+        <div v-if="event.state === 'future'" class="flex justify-between items-center mb-4 text-center">
           <div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div>
           <div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }} по МСК</p></div>
           <div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || '∞' }}</p></div>
           <div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || '∞' }}</p></div>
         </div>
-        <button @click="handleParticipate" :class="['w-full font-bold py-3 rounded-lg text-lg transition-colors', isRegistered && !event.is_team ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-primary text-white hover:opacity-90']">
+
+        <!-- Кнопка "Оценивать" для судьи на текущем мероприятии -->
+        <button
+            v-if="event.state === 'current' && isCurrentUserJudge"
+            @click="showJudgeModal = true"
+        class="block w-full text-center font-bold py-3 rounded-lg text-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+        >
+        Оценивать
+        </button>
+
+        <!-- Кнопка "Участвовать" для будущих мероприятий -->
+        <button
+            v-else-if="event.state === 'future'"
+            @click="handleParticipate"
+            :class="['w-full font-bold py-3 rounded-lg text-lg transition-colors', isRegistered && !event.is_team ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-primary text-white hover:opacity-90']"
+        >
           <span v-if="!authStore.isAuthenticated">Войти, чтобы участвовать</span>
           <span v-else-if="event.is_team">Команда</span>
           <span v-else-if="isRegistered">Отменить регистрацию</span>
@@ -371,6 +401,7 @@ const openMapViewer = () => {
         </button>
       </div>
     </footer>
+
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
@@ -384,6 +415,10 @@ const openMapViewer = () => {
           :all-teams="eventParticipations.filter(p => p.participant_type === 'team')"
           @close="showTeamManagementModal = false"
       />
+    </Modal>
+
+    <Modal :show="showJudgeModal" @close="showJudgeModal = false">
+      <JudgeModal v-if="event" :event-id="event.id" @close="showJudgeModal = false" />
     </Modal>
 
     <ActionModal

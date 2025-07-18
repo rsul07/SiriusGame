@@ -1,6 +1,6 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { fetchEventsApi, fetchEventByIdApi } from '@/api/events'
+import {defineStore} from 'pinia'
+import {ref} from 'vue'
+import {fetchEventsApi, fetchEventByIdApi, addJudgeApi, getJudgesApi, getLeaderboardApi} from '@/api/events'
 import {
     getParticipationsApi,
     createParticipationApi,
@@ -9,8 +9,10 @@ import {
     leaveOrKickApi,
     transferCaptaincyApi
 } from '@/api/participations'
-import type { IEventCard, IEventDetail, Leader, Activity, Media, Participation } from '@/types'
-export type { IEventCard, IEventDetail, Leader, Activity, Media, Participation };
+import {addScoreApi} from '@/api/scores'
+import type {IEventCard, IEventDetail, Leader, Activity, Media, Participation} from '@/types'
+
+export type {IEventCard, IEventDetail, Leader, Activity, Media, Participation};
 
 export const useEventStore = defineStore('events', () => {
     const events = ref<IEventCard[]>([])
@@ -19,6 +21,8 @@ export const useEventStore = defineStore('events', () => {
     const isLoadingDetail = ref(false)
     const error = ref<string | null>(null)
     const participationsByEvent = ref<Record<number, Participation[]>>({});
+    const judgesByEvent = ref<Record<number, any[]>>({});
+    const leaderboardByEvent = ref<Record<number, any[]>>({});
 
     const getEventById = (id: number) => {
         return detailedEvents.value[id] || events.value.find(event => event.id === id)
@@ -91,6 +95,27 @@ export const useEventStore = defineStore('events', () => {
         await fetchParticipations(eventId, true);
     }
 
+    async function addJudge(eventId: number, handle: string) {
+        await addJudgeApi(eventId, handle);
+        await fetchJudges(eventId, true); // Обновляем список судей
+    }
+
+    async function fetchJudges(eventId: number, force = false) {
+        if (judgesByEvent.value[eventId] && !force) return;
+        judgesByEvent.value[eventId] = await getJudgesApi(eventId);
+    }
+
+    async function addScore(data: any) {
+        await addScoreApi(data);
+        // После добавления очка, нужно обновить лидерборд
+        // await fetchLeaderboard(eventId, true); // eventId нужно будет передать
+    }
+
+    async function fetchLeaderboard(eventId: number, force = false) {
+        if (leaderboardByEvent.value[eventId] && !force) return;
+        leaderboardByEvent.value[eventId] = await getLeaderboardApi(eventId);
+    }
+
 
     return {
         events,
@@ -106,6 +131,12 @@ export const useEventStore = defineStore('events', () => {
         joinTeam,
         deleteParticipation,
         leaveOrKick,
-        transferCaptaincy
+        transferCaptaincy,
+        judgesByEvent, leaderboardByEvent,
+        addJudge,
+        fetchJudges,
+        addScore,
+        fetchLeaderboard,
+        detailedEvents
     }
 })

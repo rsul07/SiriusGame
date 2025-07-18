@@ -1,5 +1,5 @@
 import api from './index';
-import type {User} from '@/types';
+import type { User, IEventCard } from '@/types';
 
 // Типы для запросов и ответов
 interface LoginRequest {
@@ -66,5 +66,10 @@ export async function uploadAvatarApi(file: File): Promise<User> {
     const response = await api.post('/users/me/avatar', formData, {
         headers: {'Content-Type': 'multipart/form-data'},
     });
+    return response.data;
+}
+
+export async function getMyJudgeEventsApi(): Promise<IEventCard[]> {
+    const response = await api.get('/users/me/judge-events');
     return response.data;
 }

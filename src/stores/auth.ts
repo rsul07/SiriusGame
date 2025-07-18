@@ -1,8 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { User, RegisterFormData, Participation } from '@/types'
-import { loginApi, registerApi, getMeApi, updatePasswordApi, updateMeApi, uploadAvatarApi } from '@/api/auth'
+import type {User, RegisterFormData, Participation, IEventCard} from '@/types'
+import {
+  loginApi,
+  registerApi,
+  getMeApi,
+  updatePasswordApi,
+  updateMeApi,
+  uploadAvatarApi,
+  getMyJudgeEventsApi
+} from '@/api/auth'
 import { getMyParticipationsApi } from '@/api/participations'
 
 function mapUser(backendUser: any): User {
@@ -31,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(JSON.parse(localStorage.getItem('user_info') || 'null'));
   const redirectPath = ref<string | null>(null);
   const myParticipations = ref<Participation[]>([]);
+  const judgeEvents = ref<IEventCard[]>([]);
 
   const isAuthenticated = computed(() => !!token.value && !!user.value);
 
@@ -136,9 +145,15 @@ export const useAuthStore = defineStore('auth', () => {
     router.push({name: 'Profile'}).then();
   }
 
+  async function fetchMyJudgeEvents() {
+    if (!isAuthenticated.value) return;
+    judgeEvents.value = await getMyJudgeEventsApi();
+  }
+
   return {
     token, user, isAuthenticated, userAvatar, myParticipations,
     login, register, logout, setRedirectPath, checkAuth,
     updateProfile, changePassword, uploadAvatar, fetchMyParticipations,
+    judgeEvents, fetchMyJudgeEvents
   }
 })
