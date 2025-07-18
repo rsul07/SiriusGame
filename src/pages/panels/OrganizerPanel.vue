@@ -250,7 +250,7 @@ const saveEvent = async () => {
     delete eventData.max_teams; 
   }
 
-  console.log(eventData)
+  // console.log(eventData)
   
   try {
     let eventId: number;

@@ -1,6 +1,36 @@
 import api from './index';
 import type { IEventCard, IEventDetail, Media, Activity } from '@/types'
 
+// Общая функция обработки ошибок API
+function handleApiError(error: any, defaultMessage: string): never {
+  let errorMessage = 'Неизвестная ошибка';
+  
+  if (error.response?.data?.detail) {
+    const detail = error.response.data.detail;
+    
+    // Если detail - это массив объектов с полем msg
+    if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
+      errorMessage = detail.map(item => item.msg).join(', ');
+    }
+    // Если detail - это строка
+    else if (typeof detail === 'string') {
+      errorMessage = detail;
+    }
+    // Если detail - это объект с msg
+    else if (detail.msg) {
+      errorMessage = detail.msg;
+    }
+    // Иначе преобразуем в строку
+    else {
+      errorMessage = String(detail);
+    }
+  } else if (error.message) {
+    errorMessage = error.message;
+  }
+  
+  throw new Error(`${defaultMessage}: ${errorMessage}`);
+}
+
 // Общая функция маппинга
 function mapEventData(eventData: any) {
   return {
@@ -45,8 +75,8 @@ export async function createEventApi(eventData: Partial<IEventDetail>): Promise<
       return response.data.event_id;
     }
     throw new Error('Ошибка создания мероприятия');
-  } catch (error) {
-    throw new Error('Не удалось создать мероприятие');
+  } catch (error: any) {
+    handleApiError(error, 'Не удалось создать мероприятие');
   }
 }
 
@@ -55,8 +85,8 @@ export async function updateEventApi(id: number, eventData: Partial<IEventDetail
   try {
     const response = await api.patch(`/events/${id}`, eventData);
     return response.data.ok;
-  } catch (error) {
-    throw new Error('Не удалось обновить мероприятие: ' + error);
+  } catch (error: any) {
+    handleApiError(error, 'Не удалось обновить мероприятие');
   }
 }
 
@@ -93,22 +123,25 @@ export async function deleteEventApi(eventId: number): Promise<boolean> {
 // ===== УПРАВЛЕНИЕ АКТИВНОСТЯМИ =====
 
 // Добавляет активность к мероприятию
-export async function addActivityApi(eventId: number, activityData: Partial<Activity>): Promise<boolean> {
+export async function addActivityApi(eventId: number, activityData: Partial<Activity>): Promise<number> {
   try {
     const response = await api.post(`/events/${eventId}/activities`, activityData);
-    return response.data.ok;
-  } catch (error) {
-    throw new Error('Не удалось добавить активность');
+    if (response.data.ok) {
+      return response.data.activity_id;
+    }
+    throw new Error('Ошибка добавления активности');
+  } catch (error: any) {
+    handleApiError(error, 'Не удалось добавить активность');
   }
 }
 
-// Обновляет активность
+// Обновляет существующую активность
 export async function updateActivityApi(activityId: number, activityData: Partial<Activity>): Promise<boolean> {
   try {
     const response = await api.patch(`/activities/${activityId}`, activityData);
     return response.data.ok;
-  } catch (error) {
-    throw new Error('Не удалось обновить активность');
+  } catch (error: any) {
+    handleApiError(error, 'Не удалось обновить активность');
   }
 }
 
@@ -117,7 +150,7 @@ export async function deleteActivityApi(activityId: number): Promise<boolean> {
   try {
     const response = await api.delete(`/activities/${activityId}`);
     return response.data.ok;
-  } catch (error) {
-    throw new Error('Не удалось удалить активность');
+  } catch (error: any) {
+    handleApiError(error, 'Не удалось удалить активность');
   }
 }
