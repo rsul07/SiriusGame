@@ -82,9 +82,10 @@ const formattedLeaders = computed(() => {
       id: entry.participation.id,
       name: name || 'Неизвестный участник',
       avatarUrl: isTeam
-          ? resolveAvatarUrl(entry.participation.team_avatar_url, '/img/icons/default-team-avatar.png')
+          ? resolveAvatarUrl(entry.participation.team_avatar_url, true)
           : resolveAvatarUrl(soloParticipant?.avatar_url),
-      score: entry.total_score
+      score: entry.total_score,
+      is_team: isTeam
     }
   });
 });

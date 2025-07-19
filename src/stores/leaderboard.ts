@@ -5,5 +5,6 @@ export interface Leader {
   id: number
   name: string
   score: number
-  avatarUrl: string
+  avatarUrl: string | null
+  is_team?: boolean
 }

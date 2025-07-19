@@ -1,18 +1,19 @@
 const DEFAULT_USER_AVATAR = '/img/icons/default-avatar.svg';
+const DEFAULT_TEAM_AVATAR = '/img/icons/default-team-avatar.png';
 
 /**
  * Преобразует относительный URL аватара в полный, абсолютный URL.
  * @param avatarUrl - Относительный URL с бэкенда (например, /media/avatars/uuid.jpg).
- * @param defaultPath - Путь к дефолтной иконке, если avatarUrl отсутствует.
+ * @param is_team
  * @returns Полный, готовый к использованию URL для тега <img>.
  */
 export function resolveAvatarUrl(
     avatarUrl: string | null | undefined,
-    defaultPath: string = DEFAULT_USER_AVATAR // Используем аватар юзера по умолчанию
+    is_team: boolean = false // Используем аватар юзера по умолчанию
 ): string {
     // 1. Если URL с бэкенда отсутствует, используем указанный defaultPath.
-    if (!avatarUrl) {
-        return defaultPath;
+    if (!avatarUrl || avatarUrl == '/img/icons/default-avatar.svg' || avatarUrl == '/img/icons/default-team-avatar.png') {
+        return is_team ? DEFAULT_TEAM_AVATAR : DEFAULT_USER_AVATAR
     }
 
     // 2. Если URL уже абсолютный (например, от стороннего сервиса), возвращаем его как есть.
