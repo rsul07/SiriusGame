@@ -2,7 +2,7 @@ import api from './index';
 
 interface ScoreData {
     participation_id: number;
-    activity_id?: number;
+    activity_id: number | null;
     score: number;
     reason?: string;
 }

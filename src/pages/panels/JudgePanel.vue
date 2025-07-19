@@ -75,9 +75,9 @@ async function handleSubmitScore() {
   successMessage.value = null;
 
   try {
-    await eventStore.addScore({
+    await eventStore.addScore(form.eventId, {
       participation_id: form.participationId,
-      activity_id: form.activityId, // Может быть null
+      activity_id: form.activityId,
       score: form.score,
       reason: form.reason,
     });

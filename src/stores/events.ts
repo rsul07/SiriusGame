@@ -10,9 +10,8 @@ import {
     transferCaptaincyApi
 } from '@/api/participations'
 import {addScoreApi} from '@/api/scores'
-import type {IEventCard, IEventDetail, Leader, Activity, Media, Participation} from '@/types'
-
-export type {IEventCard, IEventDetail, Leader, Activity, Media, Participation};
+import type {IEventCard, IEventDetail, Leader, Activity, Media, Participation, LeaderboardEntry} from '@/types'
+export type {IEventCard, IEventDetail, Leader, Activity, Media, Participation, LeaderboardEntry};
 
 export const useEventStore = defineStore('events', () => {
     const events = ref<IEventCard[]>([])
@@ -22,7 +21,7 @@ export const useEventStore = defineStore('events', () => {
     const error = ref<string | null>(null)
     const participationsByEvent = ref<Record<number, Participation[]>>({});
     const judgesByEvent = ref<Record<number, any[]>>({});
-    const leaderboardByEvent = ref<Record<number, any[]>>({});
+    const leaderboardsByEvent = ref<Record<number, LeaderboardEntry[]>>({});
 
     const getEventById = (id: number) => {
         return detailedEvents.value[id] || events.value.find(event => event.id === id)
@@ -105,15 +104,22 @@ export const useEventStore = defineStore('events', () => {
         judgesByEvent.value[eventId] = await getJudgesApi(eventId);
     }
 
-    async function addScore(data: any) {
+    async function addScore(
+        eventId: number,
+        data: { participation_id: number, activity_id: number | null, score: number, reason?: string }
+    ) {
         await addScoreApi(data);
-        // После добавления очка, нужно обновить лидерборд
-        // await fetchLeaderboard(eventId, true); // eventId нужно будет передать
+        await fetchLeaderboard(eventId, true);
     }
 
     async function fetchLeaderboard(eventId: number, force = false) {
-        if (leaderboardByEvent.value[eventId] && !force) return;
-        leaderboardByEvent.value[eventId] = await getLeaderboardApi(eventId);
+        if (leaderboardsByEvent.value[eventId] && !force) return;
+        try {
+            leaderboardsByEvent.value[eventId] = await getLeaderboardApi(eventId);
+        } catch (err: any) {
+            console.error("Failed to fetch leaderboard:", err.message);
+            leaderboardsByEvent.value[eventId] = [];
+        }
     }
 
 
@@ -125,6 +131,7 @@ export const useEventStore = defineStore('events', () => {
         getEventById,
         fetchEvents,
         fetchEventById,
+        detailedEvents,
         participationsByEvent,
         fetchParticipations,
         createParticipation,
@@ -132,11 +139,11 @@ export const useEventStore = defineStore('events', () => {
         deleteParticipation,
         leaveOrKick,
         transferCaptaincy,
-        judgesByEvent, leaderboardByEvent,
+        judgesByEvent,
         addJudge,
         fetchJudges,
         addScore,
-        fetchLeaderboard,
-        detailedEvents
+        leaderboardsByEvent,
+        fetchLeaderboard
     }
 })

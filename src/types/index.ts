@@ -35,7 +35,7 @@ export interface Activity {
   is_versus: boolean;
   max_score?: number | null;
   start_dt?: string | null;
-  end_dt?: string | null; 
+  end_dt?: string | null;
 }
 
 // "Легкий" интерфейс для карточек, как его отдает API
@@ -79,6 +79,12 @@ export interface Participation {
   event_id: number;
   participant_type: 'individual' | 'team';
   team_name: string | null;
+  team_avatar_url: string | null;
   creator: User;
   members: ParticipationMember[];
+}
+
+export interface LeaderboardEntry {
+  participation: Participation;
+  total_score: number;
 }

@@ -9,8 +9,6 @@ const props = defineProps<{
   eventId: number;
 }>();
 
-const emit = defineEmits(['close']);
-
 // --- Инициализация ---
 const eventStore = useEventStore();
 
@@ -60,17 +58,18 @@ async function handleSubmitScore() {
   successMessage.value = null;
 
   try {
-    // Предполагаем, что у вас есть action addScore в eventStore
-    await eventStore.addScore({
+    await eventStore.addScore(props.eventId, {
       participation_id: form.participationId,
       activity_id: form.activityId,
       score: form.score,
       reason: form.reason,
     });
+
     successMessage.value = `Оценка успешно начислена!`;
     form.score = 0;
     form.reason = '';
     form.activityId = null;
+
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Произошла ошибка.';
   } finally {
@@ -88,7 +87,7 @@ async function handleSubmitScore() {
         <select v-model="form.participationId" required class="mt-1 w-full p-2 border rounded-md bg-white">
           <option :value="null" disabled>-- Участники --</option>
           <option v-for="p in eventParticipations" :key="p.id" :value="p.id">
-            {{ p.team_name || p.creator.fullName }}
+            {{ p.participant_type === 'team' ? p.team_name : p.members[0]?.user.full_name }}
           </option>
         </select>
       </div>

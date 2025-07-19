@@ -17,6 +17,7 @@ import {
   YandexMapMarker,
   YandexMapControls,
 } from 'vue-yandex-maps';
+import {resolveAvatarUrl} from "@/utils/resolve_avatar_url.ts";
 
 const route = useRoute()
 const router = useRouter()
@@ -64,19 +65,43 @@ const isCaptain = computed(() => {
 
 const isRegistered = computed(() => !!currentUserParticipation.value);
 
-// НОВОЕ: Функция для обработки ссылки-приглашения
+const leaderboardData = computed(() => {
+  if (!event.value) return [];
+  return eventStore.leaderboardsByEvent[event.value.id] || [];
+});
+
+const formattedLeaders = computed(() => {
+  return leaderboardData.value.map(entry => {
+    const isTeam = entry.participation.participant_type === 'team';
+    const soloParticipant = entry.participation.members[0]?.user;
+    const name = isTeam
+        ? entry.participation.team_name
+        : soloParticipant?.full_name;
+
+    return {
+      id: entry.participation.id,
+      name: name || 'Неизвестный участник',
+      avatarUrl: isTeam
+          ? resolveAvatarUrl(entry.participation.team_avatar_url, '/img/icons/default-team-avatar.png')
+          : resolveAvatarUrl(soloParticipant?.avatar_url),
+      score: entry.total_score
+    }
+  });
+});
+
+const topThree = computed(() => formattedLeaders.value.slice(0, 3));
+const theRest = computed(() => formattedLeaders.value.slice(3));
+
 async function handleTeamInvite() {
   const teamIdToJoin = route.query.joinTeam as string;
   if (!teamIdToJoin || !event.value) return;
 
-  // Если пользователь не авторизован, отправляем на страницу входа
   if (!authStore.isAuthenticated) {
-    authStore.setRedirectPath(route.fullPath); // Сохраняем полный путь для редиректа
-    router.push({ name: 'Profile' });
+    authStore.setRedirectPath(route.fullPath);
+    await router.push({name: 'Profile'});
     return;
   }
 
-  // Если пользователь уже в команде, ничего не делаем
   if (isRegistered.value) {
     await router.replace({query: {...route.query, joinTeam: undefined}});
     return;
@@ -109,7 +134,8 @@ async function loadEventData(id: string) {
   try {
     const [foundEvent] = await Promise.all([
       eventStore.fetchEventById(eventId, true),
-      eventStore.fetchParticipations(eventId, true)
+      eventStore.fetchParticipations(eventId, true),
+      eventStore.fetchLeaderboard(eventId, true)
     ]);
     if (!foundEvent) throw new Error("Мероприятие не найдено");
     event.value = foundEvent;
@@ -172,9 +198,6 @@ async function handleIndividualParticipation() {
   }
 }
 
-const leaders = computed(() => event.value?.leaderboard || [])
-const topThree = computed(() => leaders.value.slice(0, 3))
-const theRest = computed(() => leaders.value.slice(3))
 const imageViewerStyle = computed(() => ({ transform: `rotate(${imageRotation.value}deg)` }))
 
 const eventImages = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'image').map((m: Media) => m.url) : []);
@@ -270,7 +293,7 @@ const openMapViewer = () => {
 <template>
   <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка...</div>
   <div v-else-if="errorPage" class="flex items-center justify-center h-full text-red-500 p-4 text-center">{{ errorPage }}</div>
-  <div v-else-if="event" class="bg-bgMain min-h-full">
+  <div v-else-if="event" class="bg-bgMain min-h-full pb-24">
     <!-- Шапка (Карта или Изображение) -->
     <div class="relative w-full h-64 bg-gray-300">
       <div v-if="showMap" class="w-full h-full">
@@ -305,7 +328,7 @@ const openMapViewer = () => {
       <div class="flex border-b mb-4">
         <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
         <button v-if="event.activities && event.activities.length > 0" @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
-        <button v-if="event.state !== 'future' && event.leaderboard && event.leaderboard.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
+        <button v-if="event.state !== 'future' && leaderboardData.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
       </div>
       <div>
         <div v-if="activeSubTab === 'description'">
@@ -362,16 +385,25 @@ const openMapViewer = () => {
         </div>
         <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
-          <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
+          <div class="mt-8">
+            <ul class="space-y-2">
+              <li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+                <span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span>
+                <img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3 object-cover" alt="">
+                <span class="flex-1 font-medium truncate" :title="leader.name">{{ leader.name }}</span>
+                <span class="font-bold">{{ leader.score }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
 
     <!-- Футер -->
-    <footer v-if="event.state !== 'past'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
+    <footer v-if="(event.state === 'future') || (event.state === 'current' && (isCurrentUserJudge || authStore.user?.role === 'admin' || authStore.user?.role === 'organizer'))" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
       <div class="max-w-md mx-auto">
-        <!-- Блок с информацией о дате/времени (остается) -->
+        <!-- Блок с информацией о дате/времени -->
         <div v-if="event.state === 'future'" class="flex justify-between items-center mb-4 text-center">
           <div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div>
           <div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }} по МСК</p></div>
@@ -381,7 +413,7 @@ const openMapViewer = () => {
 
         <!-- Кнопка "Оценивать" для судьи на текущем мероприятии -->
         <button
-            v-if="event.state === 'current' && isCurrentUserJudge"
+            v-if="event.state === 'current' && (isCurrentUserJudge || authStore.user?.role === 'admin' || authStore.user?.role === 'organizer')"
             @click="showJudgeModal = true"
         class="block w-full text-center font-bold py-3 rounded-lg text-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
         >
@@ -401,7 +433,6 @@ const openMapViewer = () => {
         </button>
       </div>
     </footer>
-
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
