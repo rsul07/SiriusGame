@@ -7,7 +7,8 @@ import {
     joinTeamApi,
     deleteParticipationApi,
     leaveOrKickApi,
-    transferCaptaincyApi
+    transferCaptaincyApi,
+    uploadTeamAvatarApi
 } from '@/api/participations'
 import {addScoreApi} from '@/api/scores'
 import type {IEventCard, IEventDetail, Leader, Activity, Media, Participation, LeaderboardEntry} from '@/types'
@@ -122,6 +123,11 @@ export const useEventStore = defineStore('events', () => {
         }
     }
 
+    async function uploadTeamAvatar(participationId: number, eventId: number, file: File) {
+        await uploadTeamAvatarApi(participationId, file);
+        await fetchParticipations(eventId, true);
+    }
+
 
     return {
         events,
@@ -144,6 +150,7 @@ export const useEventStore = defineStore('events', () => {
         fetchJudges,
         addScore,
         leaderboardsByEvent,
-        fetchLeaderboard
+        fetchLeaderboard,
+        uploadTeamAvatar,
     }
 })

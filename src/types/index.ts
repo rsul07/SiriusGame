@@ -10,7 +10,7 @@ export interface Leader {
     id: number;
     name: string;
     score: number;
-    avatarUrl: string | null
+    avatarUrl: string | undefined
     is_team?: boolean
 }
 

@@ -40,3 +40,13 @@ export async function getMyParticipationsApi(): Promise<Participation[]> {
 export async function transferCaptaincyApi(participationId: number, newCaptainId: string): Promise<void> {
     await api.patch(`/participations/${participationId}/transfer-captaincy/${newCaptainId}`);
 }
+
+export async function uploadTeamAvatarApi(participationId: number, file: File): Promise<Participation> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post(`/participations/${participationId}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+}

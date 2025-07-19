@@ -28,6 +28,7 @@ const form = reactive({ name: '' });
 const isLoading = ref(false);
 const copyButtonText = ref('Копировать');
 const teamSearchQuery = ref('');
+const avatarInput = ref<HTMLInputElement | null>(null);
 
 // --- Логика для ActionModal (уведомления и подтверждения) ---
 const showActionModal = ref(false);
@@ -51,6 +52,10 @@ const inviteLink = computed(() => {
   if (!props.currentParticipation) return '';
   return `${window.location.origin}/events/${props.eventId}?joinTeam=${props.currentParticipation.id}`;
 });
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click();
+}
 
 // --- Обработчики действий (взаимодействие с бэкендом) ---
 async function handleCreateTeam() {
@@ -156,6 +161,21 @@ async function handleMakeCaptain(userId: string) {
   modalConfig.confirmText = 'Назначить';
   showActionModal.value = true;
 }
+
+async function onFileSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files[0] && props.currentParticipation) {
+    try {
+      await eventStore.uploadTeamAvatar(props.currentParticipation.id, props.eventId, target.files[0]);
+    } catch (error) {
+      // Обработка ошибки
+      modalConfig.type = 'error';
+      modalConfig.title = 'Ошибка';
+      modalConfig.message = 'Не удалось загрузить аватар.';
+      showActionModal.value = true;
+    }
+  }
+}
 </script>
 
 <template>
@@ -164,6 +184,17 @@ async function handleMakeCaptain(userId: string) {
     <div v-if="currentParticipation">
       <h2 class="text-2xl font-bold mb-6">{{ currentParticipation.team_name }}</h2>
 
+      <div class="flex flex-col items-center -mt-2 mb-6">
+        <img
+            :src="resolveAvatarUrl(currentParticipation.team_avatar_url, true)"
+            class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md mb-2"
+         alt="">
+        <button v-if="isCaptain" @click="triggerAvatarUpload" class="text-sm text-primary font-medium hover:underline">
+          Сменить аватар
+        </button>
+        <input type="file" ref="avatarInput" @change="onFileSelected" class="hidden" accept="image/*">
+      </div>
+      
       <div class="mb-6">
         <h3 class="font-semibold text-gray-800 mb-2">Пригласить в команду</h3>
         <div class="relative">
@@ -179,7 +210,7 @@ async function handleMakeCaptain(userId: string) {
         <ul class="space-y-2">
           <li v-for="member in currentParticipation.members" :key="member.user.id" class="flex items-center justify-between py-2 border-b last:border-b-0">
             <div class="flex items-center gap-3 min-w-0">
-              <img :src="resolveAvatarUrl(member.user.avatar_url)" class="w-10 h-10 rounded-full object-cover bg-gray-200 flex-shrink-0">
+              <img :src="resolveAvatarUrl(member.user.avatar_url)" class="w-10 h-10 rounded-full object-cover bg-gray-200 flex-shrink-0" alt="">
               <div class="flex items-baseline gap-2 min-w-0">
                 <!-- Сокращение имени (truncate) -->
                 <span class="font-medium text-gray-900 truncate" :title="member.user.full_name">{{ member.user.full_name }}</span>
