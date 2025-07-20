@@ -93,41 +93,6 @@ const formattedLeaders = computed(() => {
 const topThree = computed(() => formattedLeaders.value.slice(0, 3));
 const theRest = computed(() => formattedLeaders.value.slice(3));
 
-async function handleTeamInvite() {
-  const teamIdToJoin = route.query.joinTeam as string;
-  if (!teamIdToJoin || !event.value) return;
-
-  if (!authStore.isAuthenticated) {
-    authStore.setRedirectPath(route.fullPath);
-    await router.push({name: 'Profile'});
-    return;
-  }
-
-  if (isRegistered.value) {
-    await router.replace({query: {...route.query, joinTeam: undefined}});
-    return;
-  }
-
-  try {
-    const participationId = parseInt(teamIdToJoin);
-    await eventStore.joinTeam(participationId, event.value.id);
-    await authStore.fetchMyParticipations();
-
-    modalConfig.type = 'success';
-    modalConfig.title = 'Добро пожаловать!';
-    modalConfig.message = 'Вы успешно вступили в команду.';
-    showActionModal.value = true;
-
-  } catch (error: any) {
-    modalConfig.type = 'error';
-    modalConfig.title = 'Ошибка';
-    modalConfig.message = error.response?.data?.detail || 'Не удалось вступить в команду по ссылке.';
-    showActionModal.value = true;
-  } finally {
-    await router.replace({query: {...route.query, joinTeam: undefined}});
-  }
-}
-
 async function loadEventData(id: string) {
   isLoadingPage.value = true;
   errorPage.value = null;
@@ -141,9 +106,10 @@ async function loadEventData(id: string) {
     if (!foundEvent) throw new Error("Мероприятие не найдено");
     event.value = foundEvent;
 
-    await handleTeamInvite();
+    await checkInviteLink();
 
-    activeSubTab.value = event.value.state === 'current' ? 'activities' : 'description'
+    activeSubTab.value =
+        event.value.state === 'current' ? 'activities' : 'description';
   } catch (e: any) {
     errorPage.value = e.message;
   } finally {
@@ -151,7 +117,43 @@ async function loadEventData(id: string) {
   }
 }
 
-onMounted(() => { loadEventData(route.params.id as string); })
+// --- ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ССЫЛКИ-ПРИГЛАШЕНИЯ ---
+async function checkInviteLink() {
+  const teamIdToJoin = route.query.joinTeam;
+
+  if (!teamIdToJoin) return;
+
+  const participationId = parseInt(teamIdToJoin as string);
+
+  // Если пользователь не авторизован
+  if (!authStore.isAuthenticated) {
+    authStore.setRedirectPath(route.fullPath);
+    await router.push({name: 'Profile'});
+    return;
+  }
+
+  // Если пользователь уже здесь, показываем модалку подтверждения
+  modalConfig.type = 'confirm';
+  modalConfig.title = 'Приглашение в команду';
+  modalConfig.message = `Вы хотите вступить в команду?`; // Можно добавить имя команды
+  modalConfig.onConfirm = async () => {
+    try {
+      await eventStore.joinTeam(participationId, event.value!.id);
+      await authStore.fetchMyParticipations();
+      await router.replace({query: {}});
+    } catch (error: any) {
+
+    } finally {
+      showActionModal.value = false;
+    }
+  };
+  showActionModal.value = true;
+}
+
+onMounted(async () => {
+  const eventId = route.params.id as string;
+  await loadEventData(eventId);
+});
 watch(() => route.params.id, (newId) => { if (newId) loadEventData(newId as string); })
 
 function handleParticipate() {
