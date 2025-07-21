@@ -8,7 +8,6 @@ const props = defineProps<{
   event: IEventCard 
 }>()
 
-// --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
 const imageUrl = computed(() => {
   if (props.event?.preview_url) {
     return props.event.preview_url;
@@ -35,7 +34,7 @@ const imageUrl = computed(() => {
         <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Лидеры сейчас</h4>
           <li v-for="(leader, index) in event.leaderboard.slice(0, 3)" :key="leader.id" class="flex items-center gap-3 text-sm">
             <span class="font-mono text-gray-500 w-4 text-center">{{ index + 1 }}</span>
-            <img :src="leader.avatarUrl" class="w-6 h-6 rounded-full object-cover flex-shrink-0">
+            <img :src="leader.avatarUrl" class="w-6 h-6 rounded-full object-cover flex-shrink-0" alt="">
             <span class="font-medium text-gray-700 truncate flex-1 min-w-0">{{ leader.name }}</span>
             <span class="ml-auto font-bold text-sm text-primary">{{ leader.score }}</span>
           </li>

@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { User, RegisterFormData } from '@/types'
-import {loginApi, registerApi, getMeApi, updatePasswordApi, updateMeApi, uploadAvatarApi} from '@/api/auth'
+import type {User, RegisterFormData, Participation, IEventCard} from '@/types'
+import {
+  loginApi,
+  registerApi,
+  getMeApi,
+  updatePasswordApi,
+  updateMeApi,
+  uploadAvatarApi,
+  getMyJudgeEventsApi
+} from '@/api/auth'
+import { getMyParticipationsApi } from '@/api/participations'
 
 function mapUser(backendUser: any): User {
   return {
@@ -29,6 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('jwt_token'));
   const user = ref<User | null>(JSON.parse(localStorage.getItem('user_info') || 'null'));
   const redirectPath = ref<string | null>(null);
+  const myParticipations = ref<Participation[]>([]);
+  const judgeEvents = ref<IEventCard[]>([]);
 
   const isAuthenticated = computed(() => !!token.value && !!user.value);
 
@@ -42,8 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     return '/img/icons/default-avatar.svg';
   });
-
-  const registeredEventIds = ref<number[]>([3]);
 
   function setToken(newToken: string | null) {
     token.value = newToken;
@@ -73,15 +82,7 @@ export const useAuthStore = defineStore('auth', () => {
       password: payload.password,
     });
     setToken(tokenData.access_token);
-    const backendUser = await getMeApi();
-    const mappedUser = mapUser(backendUser);
-    
-    if (mappedUser.role === 'judge') {
-        mappedUser.teamId = 12345;
-        mappedUser.isCaptain = true;
-    }
-    
-    setUser(mappedUser);
+    await checkAuth();
     await router.push(redirectPath.value || '/app/profile');
     redirectPath.value = null;
   }
@@ -103,10 +104,20 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         const backendUser = await getMeApi();
         setUser(mapUser(backendUser));
+        await fetchMyParticipations();
       } catch (error) {
         console.error("Token validation failed:", error);
         logout();
       }
+    }
+  }
+
+  async function fetchMyParticipations() {
+    if (!isAuthenticated.value) return;
+    try {
+      myParticipations.value = await getMyParticipationsApi();
+    } catch (error) {
+      console.error("Failed to fetch my participations:", error);
     }
   }
 
@@ -130,48 +141,19 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     setUser(null);
     setToken(null);
+    myParticipations.value = [];
     router.push({name: 'Profile'}).then();
   }
 
-  async function joinOrCreateTeam(action: 'join' | 'create', teamInfo: { name: string }): Promise<{ inviteLink: string }> {
-    console.log(`Performing action: ${action} for team: ${teamInfo.name}`);
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (user.value && action === 'create') {
-        const newTeamId = Date.now();
-        const updatedUser: User = { ...user.value, teamId: newTeamId, isCaptain: true };
-        setUser(updatedUser);
-    }
-    
-    const inviteLink = `https://sirius.game/join?team=${user.value?.teamId}&token=${Math.random().toString(36).substring(2, 10)}`;
-    return { inviteLink };
-  }
-
-  function leaveTeam() {
-    if (user.value) {
-      const updatedUser: User = { ...user.value, teamId: undefined, isCaptain: false };
-      setUser(updatedUser);
-      alert('Вы вышли из команды (симуляция).');
-    }
-  }
-
-  function toggleEventRegistration(eventId: number) {
-    if (!user.value) return;
-
-    const index = registeredEventIds.value.indexOf(eventId);
-    if (index > -1) {
-      registeredEventIds.value.splice(index, 1);
-    } else {
-      registeredEventIds.value.push(eventId);
-    }
+  async function fetchMyJudgeEvents() {
+    if (!isAuthenticated.value) return;
+    judgeEvents.value = await getMyJudgeEventsApi();
   }
 
   return {
-    token, user, isAuthenticated, userAvatar, registeredEventIds,
+    token, user, isAuthenticated, userAvatar, myParticipations,
     login, register, logout, setRedirectPath, checkAuth,
-    updateProfile, changePassword, uploadAvatar,
-    joinOrCreateTeam,
-    leaveTeam,
-    toggleEventRegistration
+    updateProfile, changePassword, uploadAvatar, fetchMyParticipations,
+    judgeEvents, fetchMyJudgeEvents
   }
 })

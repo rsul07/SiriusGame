@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useEventStore, type IEventDetail, type Media, type Activity } from '@/stores/events'
+import { useEventStore, type IEventDetail, type Media, type Activity, type Participation } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import defaultImage from '../assets/default.png'
+import ActionModal from '@/components/ActionModal.vue';
+import JudgeModal from '@/components/JudgeModal.vue';
+import TeamManagementModal from '@/components/TeamManagementModal.vue'
 import LeaderboardPedestal from '@/components/LeaderboardPedestal.vue'
 import { copyToClipboard } from '@/utils/clipboard'
-import TeamManagementModal from '@/components/TeamManagementModal.vue'
-import ActionModal from '@/components/ActionModal.vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -16,14 +17,7 @@ import {
   YandexMapMarker,
   YandexMapControls,
 } from 'vue-yandex-maps';
-
-const showActionModal = ref(false);
-const modalConfig = reactive({
-  type: 'success' as 'success' | 'error' | 'confirm',
-  title: '',
-  message: '',
-  onConfirm: () => {}
-});
+import {resolveAvatarUrl} from "@/utils/resolve_avatar_url.ts";
 
 const route = useRoute()
 const router = useRouter()
@@ -34,61 +28,192 @@ const event = ref<IEventDetail | null>(null)
 const isLoadingPage = ref(true)
 const errorPage = ref<string | null>(null)
 const activeSubTab = ref<'description' | 'activities' | 'leaderboard'>('description')
-const showShareMenu = ref(false)
+const showTeamManagementModal = ref(false)
+const showJudgeModal = ref(false)
 
+const showShareMenu = ref(false)
 const isImageViewerOpen = ref(false)
 const isMapViewerOpen = ref(false)
 const currentImageIndex = ref(0)
 const imageRotation = ref(0)
 const copyButtonText = ref('Копировать')
 
-const showTeamModal = ref(false)
-const teamModalStep = ref<'choice' | 'form' | 'list' | 'link'>('choice')
-const teamAction = ref<'join' | 'create'>('create')
-const teamForm = reactive({ name: '' })
-const teamInviteLink = ref('')
-const teamIsLoading = ref(false)
+const showActionModal = ref(false);
+const modalConfig = reactive({
+  type: 'success' as 'success' | 'error' | 'confirm',
+  title: '',
+  message: '',
+  onConfirm: () => {}
+});
 
-const showTeamManagementModal = ref(false);
-
-const isRegistered = computed(() => {
-    if (!event.value) return false;
-    return authStore.registeredEventIds.includes(event.value.id);
+const eventParticipations = computed((): Participation[] => {
+  if (!event.value) return [];
+  return eventStore.participationsByEvent[event.value.id] || [];
 })
 
-const foundTeams = ref([
-  { id: 1, name: 'CyberDudes', members: 3, maxMembers: 5 },
-  { id: 2, name: 'RoboFriends', members: 5, maxMembers: 5 },
-  { id: 3, name: 'TechnoWarriors', members: 2, maxMembers: 5 },
-  { id: 4, name: 'Code Ninjas', members: 4, maxMembers: 5 },
-  { id: 5, name: 'Data Dragons', members: 1, maxMembers: 5 },
-])
-
-const teamSearchQuery = ref('')
-const filteredTeams = computed(() => {
-  if (!teamSearchQuery.value) { return foundTeams.value }
-  return foundTeams.value.filter(team => team.name.toLowerCase().includes(teamSearchQuery.value.toLowerCase()))
+const currentUserParticipation = computed(() => {
+  if (!authStore.user || !event.value) return null;
+  return eventParticipations.value.find(p =>
+      p.members.some(m => m.user.id === authStore.user!.id)
+  ) || null;
 })
 
-const leaders = computed(() => event.value?.leaderboard || [])
-const topThree = computed(() => leaders.value.slice(0, 3))
-const theRest = computed(() => leaders.value.slice(3))
+const isCaptain = computed(() => {
+  if (!authStore.user || !currentUserParticipation.value) return false;
+  return currentUserParticipation.value.creator.id === authStore.user.id;
+})
+
+const isRegistered = computed(() => !!currentUserParticipation.value);
+
+const leaderboardData = computed(() => {
+  if (!event.value) return [];
+  return eventStore.leaderboardsByEvent[event.value.id] || [];
+});
+
+const formattedLeaders = computed(() => {
+  return leaderboardData.value.map(entry => {
+    const isTeam = entry.participation.participant_type === 'team';
+    const soloParticipant = entry.participation.members[0]?.user;
+    const name = isTeam
+        ? entry.participation.team_name
+        : soloParticipant?.full_name;
+
+    return {
+      id: entry.participation.id,
+      name: name || 'Неизвестный участник',
+      avatarUrl: isTeam
+          ? resolveAvatarUrl(entry.participation.team_avatar_url, true)
+          : resolveAvatarUrl(soloParticipant?.avatar_url),
+      score: entry.total_score,
+      is_team: isTeam
+    }
+  });
+});
+
+const topThree = computed(() => formattedLeaders.value.slice(0, 3));
+const theRest = computed(() => formattedLeaders.value.slice(3));
+
+async function loadEventData(id: string) {
+  isLoadingPage.value = true;
+  errorPage.value = null;
+  const eventId = parseInt(id);
+  try {
+    const [foundEvent] = await Promise.all([
+      eventStore.fetchEventById(eventId, true),
+      eventStore.fetchParticipations(eventId, true),
+      eventStore.fetchLeaderboard(eventId, true)
+    ]);
+    if (!foundEvent) throw new Error("Мероприятие не найдено");
+    event.value = foundEvent;
+
+    await checkInviteLink();
+
+    activeSubTab.value =
+        event.value.state === 'current' ? 'activities' : 'description';
+  } catch (e: any) {
+    errorPage.value = e.message;
+  } finally {
+    isLoadingPage.value = false;
+  }
+}
+
+// --- ФУНКЦИЯ ДЛЯ ОБРАБОТКИ ССЫЛКИ-ПРИГЛАШЕНИЯ ---
+async function checkInviteLink() {
+  const teamIdToJoin = route.query.joinTeam;
+
+  if (!teamIdToJoin) return;
+
+  const participationId = parseInt(teamIdToJoin as string);
+
+  // Если пользователь не авторизован
+  if (!authStore.isAuthenticated) {
+    authStore.setRedirectPath(route.fullPath);
+    await router.push({name: 'Profile'});
+    return;
+  }
+
+  // Если пользователь уже здесь, показываем модалку подтверждения
+  modalConfig.type = 'confirm';
+  modalConfig.title = 'Приглашение в команду';
+  modalConfig.message = `Вы хотите вступить в команду?`; // Можно добавить имя команды
+  modalConfig.onConfirm = async () => {
+    try {
+      await eventStore.joinTeam(participationId, event.value!.id);
+      await authStore.fetchMyParticipations();
+      await router.replace({query: {}});
+    } catch (error: any) {
+
+    } finally {
+      showActionModal.value = false;
+    }
+  };
+  showActionModal.value = true;
+}
+
+onMounted(async () => {
+  const eventId = route.params.id as string;
+  await loadEventData(eventId);
+});
+watch(() => route.params.id, (newId) => { if (newId) loadEventData(newId as string); })
+
+function handleParticipate() {
+  if (!authStore.isAuthenticated) {
+    authStore.setRedirectPath(route.fullPath);
+    router.push({ name: 'Profile' });
+    return;
+  }
+  if (event.value?.is_team) {
+    showTeamManagementModal.value = true;
+  } else {
+    if (isRegistered.value) {
+      modalConfig.type = 'confirm';
+      modalConfig.title = 'Отмена регистрации';
+      modalConfig.message = 'Вы уверены, что хотите отменить регистрацию на это мероприятие?';
+      modalConfig.onConfirm = async () => {
+        if (!event.value || !currentUserParticipation.value) return;
+        try {
+          await eventStore.deleteParticipation(currentUserParticipation.value.id, event.value.id);
+          await authStore.fetchMyParticipations();
+          showActionModal.value = false;
+        } catch (error) {}
+      };
+      showActionModal.value = true;
+    } else {
+      handleIndividualParticipation();
+    }
+  }
+}
+
+async function handleIndividualParticipation() {
+  if (!event.value) return;
+  try {
+    await eventStore.createParticipation(event.value.id, { participant_type: 'individual' });
+    await authStore.fetchMyParticipations();
+    modalConfig.type = 'success';
+    modalConfig.title = 'Успешно!';
+    modalConfig.message = `Вы зарегистрировались на мероприятие "${event.value?.title}"!`;
+    showActionModal.value = true;
+  } catch (error: any) {
+    modalConfig.type = 'error';
+    modalConfig.title = 'Ошибка';
+    modalConfig.message = error.response?.data?.detail || 'Не удалось зарегистрироваться.';
+    showActionModal.value = true;
+  }
+}
+
 const imageViewerStyle = computed(() => ({ transform: `rotate(${imageRotation.value}deg)` }))
 
-// --- Логика для контента ---
 const eventImages = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'image').map((m: Media) => m.url) : []);
 const eventDocuments = computed(() => event.value ? event.value.media.filter((m: Media) => m.media_type === 'document') : []);
 const scoreableActivities = computed(() => event.value?.activities?.filter((a: Activity) => a.is_scoreable) || [])
 const informationalActivities = computed(() => event.value?.activities?.filter((a: Activity) => !a.is_scoreable) || [])
 
-// --- Логика для карты ---
 const geoActivities = computed(() => {
   return event.value?.activities?.filter((a): a is Activity & { latitude: number; longitude: number } =>
       a.latitude != null && a.longitude != null
   ) || [];
 });
 
-// Ключевое условие: показывать карту, если событие ТЕКУЩЕЕ и есть координаты
 const showMap = computed(() => {
   return event.value?.state === 'current' && geoActivities.value.length > 0;
 });
@@ -102,14 +227,12 @@ const mapSettings = computed(() => {
     settings.location.center = [geoActivities.value[0].longitude, geoActivities.value[0].latitude];
     settings.location.zoom = 15;
   } else {
-    // Дефолтное местоположение
     settings.location.center = [39.9594, 43.4075];
     settings.location.zoom = 13;
   }
   return settings;
 });
 
-// --- Методы ---
 const formatTimeRange = (start?: string | null, end?: string | null) => {
   if (!start) return '';
   const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
@@ -129,67 +252,6 @@ const formatTime = (dateStr?: string | null, timeStr?: string | null) => {
   const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
   return dateObj.toLocaleTimeString('ru-RU', options);
 }
-
-async function loadEventData(id: string) {
-  isLoadingPage.value = true;
-  errorPage.value = null;
-  const eventId = parseInt(id);
-
-  try {
-    const foundEvent = await eventStore.fetchEventById(eventId, true);
-    if (!foundEvent) throw new Error("Мероприятие не найдено");
-    event.value = foundEvent;
-    activeSubTab.value = event.value.state === 'current' ? 'activities' : 'description'
-  } catch (e: any) {
-    errorPage.value = e.message;
-  } finally {
-    isLoadingPage.value = false;
-  }
-}
-
-onMounted(async () => { await loadEventData(route.params.id as string); })
-watch(() => route.params.id, async (newId) => { if (newId) await loadEventData(newId as string); })
-
-function handleParticipate() {
-  if (!authStore.isAuthenticated) {
-    authStore.setRedirectPath(route.fullPath)
-    router.push({ name: 'Profile' })
-    return
-  }
-  if (event.value?.is_team) {
-    showTeamManagementModal.value = true;
-  } else {
-    if (isRegistered.value) {
-      modalConfig.type = 'confirm';
-      modalConfig.title = 'Отмена регистрации';
-      modalConfig.message = 'Вы уверены, что хотите отменить регистрацию на это мероприятие?';
-      modalConfig.onConfirm = () => {
-        authStore.toggleEventRegistration(event.value!.id);
-        showActionModal.value = false; // Закрываем окно подтверждения
-      };
-      showActionModal.value = true;
-    } else {
-      authStore.toggleEventRegistration(event.value!.id);
-      modalConfig.type = 'success';
-      modalConfig.title = 'Успешно!';
-      modalConfig.message = `Вы зарегистрировались на мероприятие "${event.value?.title}"!`;
-      showActionModal.value = true;
-    }
-  }
-}
-
-function joinSelectedTeam(teamName: string) {
-  modalConfig.type = 'success';
-  modalConfig.title = 'Успешно';
-  modalConfig.message = `Вы отправили запрос на вступление в команду "${teamName}"`;
-  showTeamModal.value = false;
-}
-
-async function copyAndCloseInviteLink() {
-  if (await copyToClipboard(teamInviteLink.value)) alert('Ссылка скопирована!');
-  showTeamModal.value = false;
-}
-
 function getShareUrl() { return window.location.href; }
 async function copyShareLink() {
   const success = await copyToClipboard(getShareUrl());
@@ -203,6 +265,19 @@ async function copyShareLink() {
     showActionModal.value = true;
   }
 }
+
+const isCurrentUserJudge = computed(() => {
+  if (!authStore.user || !event.value) return false;
+  return eventStore.judgesByEvent[event.value.id]?.some(j => j.user.id === authStore.user!.id) || false;
+});
+
+onMounted(async () => {
+  const eventId = parseInt(route.params.id as string);
+  await Promise.all([
+    loadEventData(route.params.id as string),
+    eventStore.fetchJudges(eventId)
+  ]);
+})
 
 const nextImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length }
 const prevImage = () => { if (eventImages.value.length > 0) currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length }
@@ -221,39 +296,30 @@ const openMapViewer = () => {
 <template>
   <div v-if="isLoadingPage" class="flex items-center justify-center h-full text-gray-500">Загрузка...</div>
   <div v-else-if="errorPage" class="flex items-center justify-center h-full text-red-500 p-4 text-center">{{ errorPage }}</div>
-  <div v-else-if="event" class="bg-bgMain min-h-full">
+  <div v-else-if="event" class="bg-bgMain min-h-full pb-24">
+    <!-- Шапка (Карта или Изображение) -->
     <div class="relative w-full h-80 bg-gray-300">
-
-      <!-- Блок с картой: показываем только для ТЕКУЩИХ событий с координатами -->
       <div v-if="showMap" class="w-full h-full">
-
         <yandex-map :settings="mapSettings" width="100%" height="100%" >
           <yandex-map-default-scheme-layer/>
           <yandex-map-default-features-layer/>
           <yandex-map-controls :settings="{ position: 'right' }" />
-
-          <!-- Кастомные маркеры с иконками из активностей -->
           <yandex-map-marker v-for="activity in geoActivities" :key="activity.id" :settings="{ coordinates: [activity.longitude, activity.latitude] }">
             <div class="marker-container">
               <span class="marker-icon">{{ activity.icon || '🏆' }}</span>
             </div>
           </yandex-map-marker>
         </yandex-map>
-
         <button @click.stop="openMapViewer" class="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors">
           <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 7C3 7.55228 2.55228 8 2 8C1.44772 8 1 7.55228 1 7V3C1 1.89543 1.89543 1 3 1H7C7.55228 1 8 1.44772 8 2C8 2.55228 7.55228 3 7 3H4.41421L10.7071 9.29289C11.0976 9.68342 11.0976 10.3166 10.7071 10.7071C10.3166 11.0976 9.68342 11.0976 9.29289 10.7071L3 4.41422V7Z"/><path d="M21 17C21 16.4477 21.4477 16 22 16C22.5523 16 23 16.4477 23 17V21C23 22.1046 22.1046 23 21 23H17C16.4477 23 16 22.5523 16 22C16 21.4477 16.4477 21 17 21H19.5858L13.2929 14.7071C12.9024 14.3166 12.9024 13.6834 13.2929 13.2929C13.6834 12.9024 14.3166 12.9024 14.7071 13.2929L21 19.5858V17Z"/><path d="M21 7C21 7.55228 21.4477 8 22 8C22.5523 8 23 7.55228 23 7V3C23 1.89543 22.1046 1 21 1H17C16.4477 1 16 1.44772 16 2C16 2.55228 16.4477 3 17 3H19.5858L13.2929 9.29289C12.9024 9.68342 12.9024 10.3166 13.2929 10.7071C13.6834 11.0976 14.3166 11.0976 14.7071 10.7071L21 4.41421V7Z"/><path d="M3 17C3 16.4477 2.55228 16 2 16C1.44772 16 1 16.4477 1 17V21C1 22.1046 1.89543 23 3 23H7C7.55228 23 8 22.5523 8 22C8 21.4477 7.55228 21 7 21H4.41421L10.7071 14.7071C11.0976 14.3166 11.0976 13.6834 10.7071 13.2929C10.3166 12.9024 9.68342 12.9024 9.29289 13.2929L3 19.5858V17Z"/></svg>
         </button>
       </div>
-
-      <!-- Блок с картинкой: показывается во всех остальных случаях (v-else) -->
       <div v-else class="w-full h-full">
         <img :src="eventImages[0] || defaultImage" alt="Event visual" class="w-full h-full object-cover">
         <button v-if="eventImages.length > 0" @click.stop="openImageViewer(0)" class="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors">
           <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 7C3 7.55228 2.55228 8 2 8C1.44772 8 1 7.55228 1 7V3C1 1.89543 1.89543 1 3 1H7C7.55228 1 8 1.44772 8 2C8 2.55228 7.55228 3 7 3H4.41421L10.7071 9.29289C11.0976 9.68342 11.0976 10.3166 10.7071 10.7071C10.3166 11.0976 9.68342 11.0976 9.29289 10.7071L3 4.41422V7Z"/><path d="M21 17C21 16.4477 21.4477 16 22 16C22.5523 16 23 16.4477 23 17V21C23 22.1046 22.1046 23 21 23H17C16.4477 23 16 22.5523 16 22C16 21.4477 16.4477 21 17 21H19.5858L13.2929 14.7071C12.9024 14.3166 12.9024 13.6834 13.2929 13.2929C13.6834 12.9024 14.3166 12.9024 14.7071 13.2929L21 19.5858V17Z"/><path d="M21 7C21 7.55228 21.4477 8 22 8C22.5523 8 23 7.55228 23 7V3C23 1.89543 22.1046 1 21 1H17C16.4477 1 16 1.44772 16 2C16 2.55228 16.4477 3 17 3H19.5858L13.2929 9.29289C12.9024 9.68342 12.9024 10.3166 13.2929 10.7071C13.6834 11.0976 14.3166 11.0976 14.7071 10.7071L21 4.41421V7Z"/><path d="M3 17C3 16.4477 2.55228 16 2 16C1.44772 16 1 16.4477 1 17V21C1 22.1046 1.89543 23 3 23H7C7.55228 23 8 22.5523 8 22C8 21.4477 7.55228 21 7 21H4.41421L10.7071 14.7071C11.0976 14.3166 11.0976 13.6834 10.7071 13.2929C10.3166 12.9024 9.68342 12.9024 9.29289 13.2929L3 19.5858V17Z"/></svg>
         </button>
       </div>
-
-      <!-- Общие элементы UI в шапке -->
       <div class="absolute inset-0 to-transparent pointer-events-none" :class="{ 'bg-gradient-to-t from-black/30': !showMap }"></div>
       <button @click.stop="router.back()" class="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
       <button @click.stop="showShareMenu = true" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/75 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684Zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684Z" /></svg></button>
@@ -265,7 +331,7 @@ const openMapViewer = () => {
       <div class="flex border-b mb-4">
         <button @click="activeSubTab = 'description'" :class="['py-2 px-4', activeSubTab === 'description' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Описание</button>
         <button v-if="event.activities && event.activities.length > 0" @click="activeSubTab = 'activities'" :class="['py-2 px-4', activeSubTab === 'activities' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">События</button>
-        <button v-if="event.state !== 'future' && event.leaderboard && event.leaderboard.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
+        <button v-if="event.state !== 'future' && leaderboardData.length > 0" @click="activeSubTab = 'leaderboard'" :class="['py-2 px-4', activeSubTab === 'leaderboard' ? 'border-b-2 border-primary text-primary' : 'text-gray-500']">Лидерборд</button>
       </div>
       <div>
         <div v-if="activeSubTab === 'description'">
@@ -284,23 +350,19 @@ const openMapViewer = () => {
           </div>
         </div>
         <div v-if="activeSubTab === 'activities'" class="space-y-6">
-          <!-- Оцениваемые события -->
           <div v-if="scoreableActivities.length > 0">
             <h3 class="text-lg font-bold mb-3">Оцениваемые</h3>
             <ul class="space-y-3">
               <li v-for="activity in scoreableActivities" :key="activity.id" class="flex items-start gap-4 p-4 rounded-lg shadow-sm border" :class="activity.is_versus ? 'bg-primary/5 border-primary/20' : 'bg-white border-transparent'">
                 <span class="text-3xl flex-shrink-0 pt-1">{{ activity.icon || '🏆' }}</span>
-                
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-gray-800 leading-tight break-words">{{ activity.name }}</p>
-                  <!-- Блок с временем -->
                   <div v-if="activity.start_dt" class="flex items-center gap-1.5 mt-2 text-sm text-gray-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>{{ formatTimeRange(activity.start_dt, activity.end_dt) }}</span>
                   </div>
                   <div v-if="activity.is_versus" class="mt-2"><span class="text-xs font-bold text-white bg-primary px-2 py-0.5 rounded-full">VS</span></div>
                 </div>
-
                 <div v-if="activity.max_score" class="flex-shrink-0 text-right w-20">
                   <p class="text-2xl font-bold text-primary">{{ activity.max_score }}</p>
                   <p class="text-xs text-gray-500 -mt-1">очков</p>
@@ -326,22 +388,47 @@ const openMapViewer = () => {
         </div>
         <div v-if="activeSubTab === 'leaderboard'">
           <LeaderboardPedestal :leaders="topThree" />
-          <div class="mt-8"><ul class="space-y-2"><li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm"><span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span><img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3"><span class="flex-1 font-medium">{{ leader.name }}</span><span class="font-bold">{{ leader.score }}</span></li></ul></div>
+          <div class="mt-8">
+            <ul class="space-y-2">
+              <li v-for="(leader, index) in theRest" :key="leader.id" class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+                <span class="w-8 text-gray-500 font-medium">{{ index + 4 }}</span>
+                <img :src="leader.avatarUrl" class="w-10 h-10 rounded-full mx-3 object-cover" alt="">
+                <span class="flex-1 font-medium truncate" :title="leader.name">{{ leader.name }}</span>
+                <span class="font-bold">{{ leader.score }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <div v-if="event.state === 'future'" class="h-28 mt-8"></div>
     </div>
 
     <!-- Футер -->
-    <footer v-if="event.state === 'future'" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
+    <footer v-if="(event.state === 'future') || (event.state === 'current' && (isCurrentUserJudge || authStore.user?.role === 'admin' || authStore.user?.role === 'organizer'))" class="fixed bottom-16 left-0 w-full p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 z-40">
       <div class="max-w-md mx-auto">
-        <div class="flex justify-between items-center mb-4 text-center">
+        <!-- Блок с информацией о дате/времени -->
+        <div v-if="event.state === 'future'" class="flex justify-between items-center mb-4 text-center">
           <div><p class="text-sm text-gray-500">Дата</p><p class="font-bold text-gray-800">{{ event.date }}</p></div>
           <div v-if="event.start_time"><p class="text-sm text-gray-500">Начало</p><p class="font-bold text-gray-800">{{ formatTime(event.date, event.start_time) }} по МСК</p></div>
           <div v-if="!event.is_team"><p class="text-sm text-gray-500">Участников</p><p class="font-bold text-gray-800">{{ event.max_members || '∞' }}</p></div>
           <div v-if="event.is_team"><p class="text-sm text-gray-500">Команд</p><p class="font-bold text-gray-800">{{ event.max_teams || '∞' }}</p></div>
         </div>
-        <button @click="handleParticipate" :class="['w-full font-bold py-3 rounded-lg text-lg transition-colors', isRegistered && !event.is_team ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-primary text-white hover:opacity-90']">
+
+        <!-- Кнопка "Оценивать" для судьи на текущем мероприятии -->
+        <button
+            v-if="event.state === 'current' && (isCurrentUserJudge || authStore.user?.role === 'admin' || authStore.user?.role === 'organizer')"
+            @click="showJudgeModal = true"
+        class="block w-full text-center font-bold py-3 rounded-lg text-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+        >
+        Оценивать
+        </button>
+
+        <!-- Кнопка "Участвовать" для будущих мероприятий -->
+        <button
+            v-else-if="event.state === 'future'"
+            @click="handleParticipate"
+            :class="['w-full font-bold py-3 rounded-lg text-lg transition-colors', isRegistered && !event.is_team ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-primary text-white hover:opacity-90']"
+        >
           <span v-if="!authStore.isAuthenticated">Войти, чтобы участвовать</span>
           <span v-else-if="event.is_team">Команда</span>
           <span v-else-if="isRegistered">Отменить регистрацию</span>
@@ -352,24 +439,29 @@ const openMapViewer = () => {
 
     <!-- Модальные окна -->
     <Modal :show="showShareMenu" @close="showShareMenu = false"><div class="p-6"><h3 class="text-lg font-bold mb-4">Поделиться мероприятием</h3><input type="text" readonly :value="getShareUrl()" class="w-full p-2 border rounded bg-gray-100 mb-4 focus:outline-none focus:ring-2 focus:ring-primary"><button @click="copyShareLink" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:opacity-90">{{ copyButtonText }}</button></div></Modal>
-    <Modal :show="showTeamModal" @close="showTeamModal = false"><div class="p-6"><div v-if="teamModalStep === 'choice'"><h3 class="text-lg font-bold mb-4">Командное мероприятие</h3><p class="text-gray-600 mb-6">Вы можете присоединиться к существующей команде или создать свою.</p><div class="flex flex-col gap-4"><button @click="teamAction = 'join'; teamModalStep = 'list'" class="w-full text-center p-3 bg-primary text-white rounded-lg hover:opacity-90">Вступить в команду</button><button @click="teamAction = 'create'; teamModalStep = 'form'" class="w-full text-center p-3 bg-gray-100 rounded-lg hover:bg-gray-200">Создать команду</button></div></div><form v-if="teamModalStep === 'form' && teamAction === 'create'"><h3 class="text-lg font-bold mb-4">Создать команду</h3><div><label for="team-name" class="block text-sm font-medium text-gray-700">Название команды</label><input v-model="teamForm.name" type="text" id="team-name" required class="mt-1 w-full p-2 border rounded-md"></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button><button type="submit" :disabled="teamIsLoading" class="px-4 py-2 rounded-md bg-primary text-white hover:opacity-90 disabled:bg-gray-400">{{ teamIsLoading ? 'Создание...' : 'Создать' }}</button></div></form><div v-if="teamModalStep === 'list'"><h3 class="text-lg font-bold mb-4">Вступить в команду</h3><p class="text-gray-600 mb-4">Найдите свою команду в списке или воспользуйтесь поиском.</p><div class="border rounded-lg"><input v-model="teamSearchQuery" type="text" placeholder="Поиск по названию..." class="w-full p-2 border-b focus:outline-none focus:ring-1 focus:ring-primary"><ul class="space-y-1 max-h-64 overflow-y-auto p-2"><li v-for="team in filteredTeams" :key="team.id" class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"><div><p class="font-semibold">{{ team.name }}</p><p class="text-sm text-gray-500">{{ team.members }} / {{ team.maxMembers }} участников</p></div><button @click="joinSelectedTeam(team.name)" :disabled="team.members >= team.maxMembers" class="px-4 py-1 text-sm bg-primary text-white rounded-full hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed">Вступить</button></li><li v-if="filteredTeams.length === 0" class="text-center text-gray-500 p-4">Команды не найдены.</li></ul></div><div class="flex justify-end gap-4 mt-6"><button @click="teamModalStep = 'choice'" type="button" class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">Назад</button></div></div><div v-if="teamModalStep === 'link'"><h3 class="text-lg font-bold mb-4">Команда создана!</h3><p class="text-gray-600 mb-4">Поделитесь этой ссылкой с друзьями.</p><input type="text" readonly :value="teamInviteLink" class="w-full p-2 border rounded bg-gray-100 mb-4"><div class="flex gap-4"><button @click="copyAndCloseInviteLink" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">Скопировать и закрыть</button><button @click="showTeamModal = false" type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Закрыть</button></div></div></div></Modal>
-    <!-- Модальное окно для УПРАВЛЕНИЯ КОМАНДОЙ -->
+
     <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
-      <TeamManagementModal :event-id="event.id" @close="showTeamManagementModal = false" />
-    </Modal>
-    <Modal :show="showTeamManagementModal" @close="showTeamManagementModal = false">
-      <TeamManagementModal 
-        @close="showTeamManagementModal = false"
+      <TeamManagementModal
+          v-if="event"
+          :event-id="event.id"
+          :current-participation="currentUserParticipation"
+          :is-captain="isCaptain"
+          :all-teams="eventParticipations.filter(p => p.participant_type === 'team')"
+          @close="showTeamManagementModal = false"
       />
     </Modal>
 
-    <ActionModal 
-      :show="showActionModal"
-      :type="modalConfig.type"
-      :title="modalConfig.title"
-      :message="modalConfig.message"
-      @close="showActionModal = false"
-      @confirm="modalConfig.onConfirm"
+    <Modal :show="showJudgeModal" @close="showJudgeModal = false">
+      <JudgeModal v-if="event" :event-id="event.id" @close="showJudgeModal = false" />
+    </Modal>
+
+    <ActionModal
+        :show="showActionModal"
+        :type="modalConfig.type"
+        :title="modalConfig.title"
+        :message="modalConfig.message"
+        @close="showActionModal = false"
+        @confirm="modalConfig.onConfirm"
     />
 
     <!-- Полноэкранные вьюверы -->
@@ -415,8 +507,7 @@ const openMapViewer = () => {
 </template>
 
 <style scoped>
-
-/* Стили для кастомных маркеров */
+/* Стили для кастомных маркеров на карте */
 .marker-container {
   position: relative;
   display: flex;
@@ -466,5 +557,20 @@ const openMapViewer = () => {
 }
 .marker-container-fs:hover .marker-icon-fs {
   transform: scale(1.1);
+}
+
+/* Стили для анимации модальных окон */
+.modal-fade-enter-active, .modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.modal-fade-enter-from, .modal-fade-leave-to {
+  opacity: 0;
+}
+.image-fade-enter-active, .image-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.image-fade-enter-from, .image-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
 }
 </style>

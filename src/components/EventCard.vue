@@ -21,14 +21,10 @@ const badge = computed(() => {
   }
 })
 
-// --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
 const imageUrl = computed(() => {
-  // 1. Проверяем, есть ли preview_url
   if (props.event?.preview_url) {
-    // API уже отдает полный URL, поэтому префикс не нужен
     return props.event.preview_url;
   }
-  // 2. Если нет, возвращаем дефолтное изображение
   return defaultImage; 
 })
 </script>
